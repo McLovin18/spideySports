@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 300 300">
-  <!-- Categoría Niños -->
-  <rect width="300" height="300" fill="#f8edeb"/>
-  <path d="M120,70 C105,70 95,80 95,95 C95,110 105,120 120,120 C135,120 145,110 145,95 C145,80 135,70 120,70 Z" fill="#ffffff"/>
-  <path d="M180,70 C165,70 155,80 155,95 C155,110 165,120 180,120 C195,120 205,110 205,95 C205,80 195,70 180,70 Z" fill="#ffffff"/>
-  <path d="M95,130 L145,130 L140,230 L120,230 L95,130 Z" fill="#ffffff"/>
-  <path d="M155,130 L205,130 L180,230 L160,230 L155,130 Z" fill="#ffffff"/>
-  <text x="150" y="280" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" fill="#000000">Niños</text>
-</svg>

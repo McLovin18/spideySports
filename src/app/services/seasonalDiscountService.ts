@@ -4,11 +4,9 @@ import { db } from '../utils/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 export type SeasonalDiscountReason =
-  | 'black_friday'
-  | 'navidad'
-  | 'san_valentin'
-  | 'vuelta_clases'
-  | 'aniversario'
+  | 'semifinales_champions'
+  | 'mundial_2026'
+  | 'evento_retro_spidey'
   | 'otros';
 
 export interface SeasonalDiscountProduct {
@@ -61,12 +59,10 @@ export const saveSeasonalDiscountConfig = async (
 };
 
 export const SEASONAL_DISCOUNT_REASONS: { value: SeasonalDiscountReason; label: string }[] = [
-  { value: 'black_friday', label: 'Black Friday' },
-  { value: 'navidad', label: 'Navidad' },
-  { value: 'san_valentin', label: 'San Valentín' },
-  { value: 'vuelta_clases', label: 'Vuelta a clases' },
-  { value: 'aniversario', label: 'Aniversario de la tienda' },
-  { value: 'otros', label: 'Otros / campaña personalizada' },
+  { value: 'semifinales_champions', label: 'Semifinales de la Champions' },
+  { value: 'mundial_2026', label: 'Camino al Mundial 2026' },
+  { value: 'evento_retro_spidey', label: 'Kick-off Retro Spidey' },
+  { value: 'otros', label: 'Campaña personalizada / otros' },
 ];
 
 // Utilidad: verifica si una configuración de descuentos está activa en la fecha indicada (o hoy)

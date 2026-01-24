@@ -1,19 +1,39 @@
 'use client';
 
 import { db } from '../utils/firebase';
-import { 
-  collection, 
-  doc, 
-  getDoc, 
-  setDoc, 
-  updateDoc, 
-  deleteDoc, 
-  getDocs, 
-  query, 
+import {
+  collection,
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  getDocs,
+  query,
   where,
   increment,
   runTransaction
 } from 'firebase/firestore';
+import {
+  DEFAULT_JERSEY_SIZE_STOCK,
+  JERSEY_SIZE_OPTIONS,
+  type JerseySizeCode,
+  jerseySizeLabel
+} from '../constants/jersey';
+
+export interface JerseyVersion {
+  id: string;
+  label: string;
+  imageUrl?: string;
+  sizeStocks: SizeStock[];
+  availableStock: number;
+  isActive: boolean;
+}
+
+export interface SizeStock {
+  code: JerseySizeCode;
+  quantity: number;
+}
 
 export interface ProductInventory {
   productId: number;
@@ -27,23 +47,193 @@ export interface ProductInventory {
   lastUpdated: string;
   description?: string;
   details?: string[]; // Detalles del producto
+  versions?: JerseyVersion[];
+  defaultVersionId?: string;
+  sizeStocks?: SizeStock[];
 }
+
+const normalizeSizeStocks = (data?: SizeStock[]): SizeStock[] => {
+  if (!data || data.length === 0) {
+    return Object.entries(DEFAULT_JERSEY_SIZE_STOCK).map(([code, quantity]) => ({
+      code: code as JerseySizeCode,
+      quantity,
+    }));
+  }
+
+  const seen = new Set<JerseySizeCode>();
+  const normalized: SizeStock[] = [];
+
+  for (const size of data) {
+    if (!size?.code) continue;
+    if (seen.has(size.code)) continue;
+
+    normalized.push({
+      code: size.code,
+      quantity: typeof size.quantity === 'number' && size.quantity >= 0 ? size.quantity : 0,
+    });
+    seen.add(size.code);
+  }
+
+  // Asegurar que existan todas las tallas base aunque no tengan stock
+  JERSEY_SIZE_OPTIONS.forEach((size) => {
+    if (!seen.has(size.code)) {
+      normalized.push({ code: size.code, quantity: 0 });
+    }
+  });
+
+  return normalized;
+};
+
+const computeTotalStock = (sizeStocks?: SizeStock[], fallbackStock?: number): number => {
+  if (!sizeStocks || sizeStocks.length === 0) {
+    return typeof fallbackStock === 'number' ? fallbackStock : 0;
+  }
+
+  return sizeStocks.reduce((acc, item) => acc + Math.max(0, item.quantity || 0), 0);
+};
+
+const generateVersionId = (index: number) => `version-${Date.now()}-${index}-${Math.floor(Math.random() * 1000)}`;
+
+const normalizeVersion = (raw: any, index: number): JerseyVersion => {
+  const sizeStocks = normalizeSizeStocks(raw?.sizeStocks);
+  const availableStock = computeTotalStock(sizeStocks, raw?.availableStock);
+
+  return {
+    id: typeof raw?.id === 'string' && raw.id.trim() !== '' ? raw.id : generateVersionId(index),
+    label: typeof raw?.label === 'string' && raw.label.trim() !== '' ? raw.label : `Versión ${index + 1}`,
+    imageUrl: typeof raw?.imageUrl === 'string' ? raw.imageUrl : undefined,
+    sizeStocks,
+    availableStock,
+    isActive: raw?.isActive ?? availableStock > 0,
+  };
+};
+
+const normalizeVersions = (rawVersions: any[] | undefined | null): JerseyVersion[] => {
+  if (!Array.isArray(rawVersions) || rawVersions.length === 0) {
+    return [];
+  }
+
+  return rawVersions.map((version, index) => normalizeVersion(version, index));
+};
+
+const aggregateSizeStocksFromVersions = (versions: JerseyVersion[]): SizeStock[] => {
+  if (!versions.length) return [];
+
+  const totals = new Map<JerseySizeCode, number>();
+  JERSEY_SIZE_OPTIONS.forEach((size) => totals.set(size.code, 0));
+
+  versions.forEach((version) => {
+    version.sizeStocks.forEach((size) => {
+      const current = totals.get(size.code) ?? 0;
+      totals.set(size.code, current + Math.max(0, size.quantity || 0));
+    });
+  });
+
+  return Array.from(totals.entries()).map(([code, quantity]) => ({
+    code,
+    quantity,
+  }));
+};
+
+const refreshVersionAggregate = (version: JerseyVersion): JerseyVersion => {
+  const normalizedSizes = normalizeSizeStocks(version.sizeStocks);
+  const availableStock = computeTotalStock(normalizedSizes, version.availableStock);
+  return {
+    ...version,
+    sizeStocks: normalizedSizes,
+    availableStock,
+    isActive: availableStock > 0,
+  };
+};
+
+const hydrateProductFromFirestore = (data: any, fallbackId: number): ProductInventory => {
+  const normalizedVersions = normalizeVersions(data?.versions);
+  let normalizedSizes = normalizeSizeStocks(data?.sizeStocks);
+
+  if (normalizedVersions.length > 0) {
+    normalizedSizes = aggregateSizeStocksFromVersions(normalizedVersions);
+  }
+
+  const stock = computeTotalStock(normalizedSizes, data?.stock);
+
+  const defaultVersionId = normalizedVersions.length > 0
+    ? (typeof data?.defaultVersionId === 'string' && normalizedVersions.some((v) => v.id === data.defaultVersionId)
+        ? data.defaultVersionId
+        : normalizedVersions[0].id)
+    : undefined;
+
+  const resolvedImages = (() => {
+    if (normalizedVersions.length > 0) {
+      const defaultVersion = normalizedVersions.find((version) => version.id === defaultVersionId) ?? normalizedVersions[0];
+      const primaryImage = defaultVersion?.imageUrl?.trim();
+      const additionalImages = normalizedVersions
+        .filter((version) => version.id !== defaultVersion?.id)
+        .map((version) => version.imageUrl?.trim())
+        .filter((url): url is string => Boolean(url && url.length > 0));
+
+      const ordered = [primaryImage, ...additionalImages].filter((url): url is string => Boolean(url));
+      if (ordered.length > 0) {
+        return ordered.filter((url, index, arr) => arr.indexOf(url) === index);
+      }
+    }
+
+    if (Array.isArray(data?.images) && data.images.length > 0) {
+      return data.images;
+    }
+
+    return ['/images/product1.svg'];
+  })();
+
+  return {
+    ...(data as ProductInventory),
+    productId: data?.productId ?? fallbackId,
+    sizeStocks: normalizedSizes,
+    versions: normalizedVersions.length > 0 ? normalizedVersions : undefined,
+    defaultVersionId,
+    images: resolvedImages,
+    stock,
+    isActive: stock > 0 ? data?.isActive !== false : false,
+    lastUpdated: data?.lastUpdated ?? new Date().toISOString(),
+  };
+};
 
 class InventoryService {
   private collectionName = 'inventory';
 
   // ✅ Obtener stock de un producto específico
-  async getProductStock(productId: number): Promise<number> {
+  async getProductStock(productId: number, sizeCode?: JerseySizeCode, versionId?: string): Promise<number> {
     try {
       const docRef = doc(db, this.collectionName, productId.toString());
       const docSnap = await getDoc(docRef);
       
-      if (docSnap.exists()) {
-        const data = docSnap.data() as ProductInventory;
-        return data.stock || 0;
+      if (!docSnap.exists()) {
+        return 0;
       }
-      
-      return 0; // Si no existe, stock es 0
+
+      const product = hydrateProductFromFirestore(docSnap.data(), productId);
+
+      if (versionId && Array.isArray(product.versions) && product.versions.length > 0) {
+        const targetVersion = product.versions.find((version) => version.id === versionId);
+        if (!targetVersion) {
+          return 0;
+        }
+
+        if (sizeCode) {
+          const size = targetVersion.sizeStocks.find((s) => s.code === sizeCode);
+          return size ? size.quantity : 0;
+        }
+
+        return targetVersion.availableStock;
+      }
+
+      const sizeStocks = normalizeSizeStocks(product.sizeStocks);
+
+      if (sizeCode) {
+        const found = sizeStocks.find((size) => size.code === sizeCode);
+        return found ? found.quantity : 0;
+      }
+
+      return computeTotalStock(sizeStocks, product.stock);
     } catch (error) {
       console.error('Error obteniendo stock:', error);
       return 0;
@@ -51,16 +241,42 @@ class InventoryService {
   }
 
   // ✅ Verificar si un producto está disponible (automático basado en stock)
-  async isProductAvailable(productId: number, requestedQuantity: number = 1): Promise<boolean> {
+  async isProductAvailable(
+    productId: number,
+    requestedQuantity: number = 1,
+    sizeCode?: JerseySizeCode,
+    versionId?: string
+  ): Promise<boolean> {
     try {
       const docRef = doc(db, this.collectionName, productId.toString());
       const docSnap = await getDoc(docRef);
       
       if (!docSnap.exists()) return false;
       
-      const data = docSnap.data() as ProductInventory;
-      // Producto disponible si tiene stock suficiente (isActive se actualiza automáticamente)
-      return data.stock >= requestedQuantity;
+      const product = hydrateProductFromFirestore(docSnap.data(), productId);
+
+      if (versionId && Array.isArray(product.versions) && product.versions.length > 0) {
+        const targetVersion = product.versions.find((version) => version.id === versionId);
+        if (!targetVersion) return false;
+
+        if (sizeCode) {
+          const selectedSize = targetVersion.sizeStocks.find((size) => size.code === sizeCode);
+          if (!selectedSize) return false;
+          return selectedSize.quantity >= requestedQuantity;
+        }
+
+        return targetVersion.availableStock >= requestedQuantity;
+      }
+
+      const sizeStocks = normalizeSizeStocks(product.sizeStocks);
+
+      if (sizeCode) {
+        const selectedSize = sizeStocks.find((size) => size.code === sizeCode);
+        if (!selectedSize) return false;
+        return selectedSize.quantity >= requestedQuantity;
+      }
+
+      return product.stock >= requestedQuantity;
     } catch (error) {
       console.error('Error verificando disponibilidad:', error);
       return false;
@@ -68,7 +284,7 @@ class InventoryService {
   }
 
   // ✅ Reducir stock cuando se hace una compra
-  async reduceStock(productId: number, quantity: number): Promise<boolean> {
+  async reduceStock(productId: number, quantity: number, sizeCode?: JerseySizeCode, versionId?: string): Promise<boolean> {
     try {
       const docRef = doc(db, this.collectionName, productId.toString());
       const docSnap = await getDoc(docRef);
@@ -77,20 +293,111 @@ class InventoryService {
         console.error(`❌ Producto ${productId} no encontrado en inventario`);
         throw new Error(`El producto ${productId} no está registrado en el inventario`);
       }
-      
-      const currentData = docSnap.data() as ProductInventory;
-      
-      if (currentData.stock < quantity) {
-        console.error(`❌ Stock insuficiente para producto ${productId}: Disponible: ${currentData.stock}, Solicitado: ${quantity}`);
-        throw new Error(`Stock insuficiente para "${currentData.name}". Stock disponible: ${currentData.stock}, cantidad solicitada: ${quantity}`);
+
+      const product = hydrateProductFromFirestore(docSnap.data(), productId);
+      const versions = Array.isArray(product.versions) ? [...product.versions] : [];
+      const hasVersions = versions.length > 0;
+
+      if (hasVersions) {
+        const effectiveVersionId = versionId || product.defaultVersionId || versions[0].id;
+        if (!sizeCode) {
+          throw new Error('Debes seleccionar una talla para actualizar el stock de esta versión.');
+        }
+
+        const versionIndex = versions.findIndex((version) => version.id === effectiveVersionId);
+        if (versionIndex === -1) {
+          throw new Error('La versión seleccionada no pertenece a este producto.');
+        }
+
+        const currentVersion = versions[versionIndex];
+        const versionSizes = normalizeSizeStocks(currentVersion.sizeStocks);
+        const sizeIndex = versionSizes.findIndex((size) => size.code === sizeCode);
+
+        if (sizeIndex === -1) {
+          throw new Error(`La talla seleccionada (${jerseySizeLabel(sizeCode)}) no existe en esta versión.`);
+        }
+
+        const selectedSize = versionSizes[sizeIndex];
+
+        if (selectedSize.quantity < quantity) {
+          console.error(`❌ Stock insuficiente para producto ${productId} versión ${effectiveVersionId} talla ${sizeCode}: Disponible ${selectedSize.quantity}, Solicitado ${quantity}`);
+          throw new Error(`Stock insuficiente para la talla ${jerseySizeLabel(sizeCode)} en esta versión. Disponible: ${selectedSize.quantity}, solicitado: ${quantity}`);
+        }
+
+        const updatedVersionSizes = versionSizes.map((size, idx) =>
+          idx === sizeIndex
+            ? { ...size, quantity: size.quantity - quantity }
+            : size
+        );
+
+        const updatedVersions = versions.map((version, idx) =>
+          idx === versionIndex
+            ? refreshVersionAggregate({ ...version, sizeStocks: updatedVersionSizes })
+            : refreshVersionAggregate(version)
+        );
+
+        const aggregatedSizeStocks = aggregateSizeStocksFromVersions(updatedVersions);
+        const newTotal = computeTotalStock(aggregatedSizeStocks);
+
+        await updateDoc(docRef, {
+          versions: updatedVersions,
+          sizeStocks: aggregatedSizeStocks,
+          stock: newTotal,
+          isActive: newTotal > 0,
+          defaultVersionId: effectiveVersionId,
+          lastUpdated: new Date().toISOString(),
+        });
+
+        return true;
       }
-      
-      await updateDoc(docRef, {
-        stock: increment(-quantity),
-        isActive: (currentData.stock - quantity) > 0, // Actualizar isActive automáticamente
-        lastUpdated: new Date().toISOString()
-      });
-      
+
+      const sizeStocks = normalizeSizeStocks(product.sizeStocks);
+
+      if (Array.isArray(product.sizeStocks) && product.sizeStocks.length > 0) {
+        if (!sizeCode) {
+          throw new Error('Debes seleccionar una talla para actualizar el stock de esta camiseta.');
+        }
+
+        const sizeIndex = sizeStocks.findIndex((size) => size.code === sizeCode);
+
+        if (sizeIndex === -1) {
+          throw new Error(`La talla seleccionada (${jerseySizeLabel(sizeCode)}) no existe en este producto.`);
+        }
+
+        const selectedSize = sizeStocks[sizeIndex];
+
+        if (selectedSize.quantity < quantity) {
+          console.error(`❌ Stock insuficiente para producto ${productId} en talla ${sizeCode}: Disponible: ${selectedSize.quantity}, Solicitado: ${quantity}`);
+          throw new Error(`Stock insuficiente para la talla ${jerseySizeLabel(sizeCode)}. Disponible: ${selectedSize.quantity}, solicitado: ${quantity}`);
+        }
+
+        const updatedStocks = sizeStocks.map((size, idx) =>
+          idx === sizeIndex
+            ? { ...size, quantity: size.quantity - quantity }
+            : size
+        );
+
+        const newTotal = computeTotalStock(updatedStocks, product.stock - quantity);
+
+        await updateDoc(docRef, {
+          sizeStocks: updatedStocks,
+          stock: newTotal,
+          isActive: newTotal > 0,
+          lastUpdated: new Date().toISOString(),
+        });
+      } else {
+        if (product.stock < quantity) {
+          console.error(`❌ Stock insuficiente para producto ${productId}: Disponible: ${product.stock}, Solicitado: ${quantity}`);
+          throw new Error(`Stock insuficiente para "${product.name}". Stock disponible: ${product.stock}, cantidad solicitada: ${quantity}`);
+        }
+
+        await updateDoc(docRef, {
+          stock: increment(-quantity),
+          isActive: (product.stock - quantity) > 0,
+          lastUpdated: new Date().toISOString()
+        });
+      }
+
       return true;
     } catch (error) {
       console.error('❌ Error reduciendo stock:', error);
@@ -99,7 +406,7 @@ class InventoryService {
   }
 
   // ✅ Agregar stock (para admin) - actualiza isActive automáticamente
-  async addStock(productId: number, quantity: number): Promise<boolean> {
+  async addStock(productId: number, quantity: number, sizeCode?: JerseySizeCode, versionId?: string): Promise<boolean> {
     try {
       const docRef = doc(db, this.collectionName, productId.toString());
       const docSnap = await getDoc(docRef);
@@ -109,15 +416,93 @@ class InventoryService {
         return false;
       }
 
-      const currentData = docSnap.data() as ProductInventory;
-      const newStock = currentData.stock + quantity;
-      
-      await updateDoc(docRef, {
-        stock: increment(quantity),
-        isActive: newStock > 0, // Activar automáticamente si hay stock
-        lastUpdated: new Date().toISOString()
-      });
-      
+      const product = hydrateProductFromFirestore(docSnap.data(), productId);
+      const versions = Array.isArray(product.versions) ? [...product.versions] : [];
+      const hasVersions = versions.length > 0;
+
+      if (hasVersions) {
+        const effectiveVersionId = versionId || product.defaultVersionId || versions[0].id;
+        if (!sizeCode) {
+          throw new Error('Debes seleccionar una talla para agregar stock de camisetas.');
+        }
+
+        const versionIndex = versions.findIndex((version) => version.id === effectiveVersionId);
+        if (versionIndex === -1) {
+          throw new Error('La versión seleccionada no pertenece a este producto.');
+        }
+
+        const currentVersion = versions[versionIndex];
+        const versionSizes = normalizeSizeStocks(currentVersion.sizeStocks);
+        const sizeIndex = versionSizes.findIndex((size) => size.code === sizeCode);
+
+        if (sizeIndex === -1) {
+          throw new Error(`La talla seleccionada (${jerseySizeLabel(sizeCode)}) no pertenece a esta versión.`);
+        }
+
+        const updatedVersionSizes = versionSizes.map((size, idx) =>
+          idx === sizeIndex
+            ? { ...size, quantity: size.quantity + quantity }
+            : size
+        );
+
+        const updatedVersions = versions.map((version, idx) =>
+          idx === versionIndex
+            ? refreshVersionAggregate({ ...version, sizeStocks: updatedVersionSizes })
+            : refreshVersionAggregate(version)
+        );
+
+        const aggregatedSizeStocks = aggregateSizeStocksFromVersions(updatedVersions);
+        const newTotal = computeTotalStock(aggregatedSizeStocks);
+
+        await updateDoc(docRef, {
+          versions: updatedVersions,
+          sizeStocks: aggregatedSizeStocks,
+          stock: newTotal,
+          isActive: newTotal > 0,
+          defaultVersionId: effectiveVersionId,
+          lastUpdated: new Date().toISOString(),
+        });
+
+        return true;
+      }
+
+      const sizeStocks = normalizeSizeStocks(product.sizeStocks);
+
+      if (Array.isArray(product.sizeStocks) && product.sizeStocks.length > 0) {
+        if (!sizeCode) {
+          throw new Error('Debes seleccionar una talla para agregar stock de camisetas.');
+        }
+
+        const sizeIndex = sizeStocks.findIndex((size) => size.code === sizeCode);
+
+        if (sizeIndex === -1) {
+          throw new Error(`La talla seleccionada (${jerseySizeLabel(sizeCode)}) no pertenece a este producto.`);
+        }
+
+        const updatedStocks = sizeStocks.map((size, idx) =>
+          idx === sizeIndex
+            ? { ...size, quantity: size.quantity + quantity }
+            : size
+        );
+
+        const newTotal = computeTotalStock(updatedStocks, product.stock + quantity);
+
+        await updateDoc(docRef, {
+          sizeStocks: updatedStocks,
+          stock: newTotal,
+          isActive: newTotal > 0,
+          lastUpdated: new Date().toISOString(),
+        });
+      } else {
+        const newStock = product.stock + quantity;
+
+        await updateDoc(docRef, {
+          stock: increment(quantity),
+          isActive: newStock > 0,
+          lastUpdated: new Date().toISOString()
+        });
+      }
+
       return true;
     } catch (error) {
       console.error('Error agregando stock:', error);
@@ -126,13 +511,30 @@ class InventoryService {
   }
 
   // ✅ Crear o actualizar producto en inventario (para admin)
-  async createOrUpdateProduct(productData: Omit<ProductInventory, 'lastUpdated' | 'isActive'>): Promise<boolean> {
+  async createOrUpdateProduct(productData: Omit<ProductInventory, 'lastUpdated' | 'isActive' | 'stock'> & { stock?: number }): Promise<boolean> {
     try {
       const docRef = doc(db, this.collectionName, productData.productId.toString());
-      
+      const normalizedVersions = normalizeVersions(productData.versions);
+
+      const normalizedSizes = normalizedVersions.length > 0
+        ? aggregateSizeStocksFromVersions(normalizedVersions)
+        : normalizeSizeStocks(productData.sizeStocks);
+
+      const totalStock = computeTotalStock(normalizedSizes, productData.stock);
+
+      const effectiveDefaultVersionId = normalizedVersions.length > 0
+        ? (productData.defaultVersionId && normalizedVersions.some((v) => v.id === productData.defaultVersionId)
+            ? productData.defaultVersionId
+            : normalizedVersions[0].id)
+        : undefined;
+
       await setDoc(docRef, {
         ...productData,
-        isActive: productData.stock > 0, // Activar automáticamente basado en stock
+        sizeStocks: normalizedSizes,
+        versions: normalizedVersions.length > 0 ? normalizedVersions : [],
+        defaultVersionId: effectiveDefaultVersionId,
+        stock: totalStock,
+        isActive: totalStock > 0, // Activar automáticamente basado en stock
         lastUpdated: new Date().toISOString()
       }, { merge: true });
       
@@ -168,11 +570,29 @@ class InventoryService {
           throw new Error(`Ya existe un producto con el ID ${productData.productId}. Elige otro ID dentro del rango.`);
         }
 
-        const oldData = oldSnap.data() as ProductInventory;
+        const oldData = hydrateProductFromFirestore(oldSnap.data(), originalProductId);
+        const normalizedVersions = normalizeVersions(productData.versions ?? oldData.versions);
+
+        const normalizedSizes = normalizedVersions.length > 0
+          ? aggregateSizeStocksFromVersions(normalizedVersions)
+          : normalizeSizeStocks(productData.sizeStocks ?? oldData.sizeStocks);
+
+        const totalStock = computeTotalStock(normalizedSizes, productData.stock ?? oldData.stock);
+
+        const effectiveDefaultVersionId = normalizedVersions.length > 0
+          ? ((productData.defaultVersionId && normalizedVersions.some((v) => v.id === productData.defaultVersionId))
+              ? productData.defaultVersionId
+              : normalizedVersions[0].id)
+          : oldData.defaultVersionId;
+
         const merged: ProductInventory = {
           ...oldData,
           ...productData,
-          isActive: productData.stock > 0,
+          versions: normalizedVersions.length > 0 ? normalizedVersions : [],
+          sizeStocks: normalizedSizes,
+          defaultVersionId: effectiveDefaultVersionId,
+          stock: totalStock,
+          isActive: totalStock > 0,
           lastUpdated: new Date().toISOString(),
         };
 
@@ -202,13 +622,10 @@ class InventoryService {
       const products: ProductInventory[] = [];
       
       querySnapshot.forEach((doc) => {
-        const productData = doc.data() as ProductInventory;
+        const productData = hydrateProductFromFirestore(doc.data(), parseInt(doc.id, 10));
         // Filtrar por stock en memoria (solo productos con stock > 0)
         if (productData.stock > 0) {
-          products.push({
-            ...productData,
-            productId: parseInt(doc.id)
-          });
+          products.push(productData);
         }
       });
       
@@ -232,10 +649,7 @@ class InventoryService {
       const products: ProductInventory[] = [];
       
       querySnapshot.forEach((doc) => {
-        products.push({
-          ...doc.data() as ProductInventory,
-          productId: parseInt(doc.id)
-        });
+        products.push(hydrateProductFromFirestore(doc.data(), parseInt(doc.id, 10)));
       });
       
       return products.sort((a, b) => a.productId - b.productId);
@@ -265,10 +679,7 @@ class InventoryService {
       const products: ProductInventory[] = [];
       
       querySnapshot.forEach((doc) => {
-        products.push({
-          ...doc.data() as ProductInventory,
-          productId: parseInt(doc.id)
-        });
+        products.push(hydrateProductFromFirestore(doc.data(), parseInt(doc.id, 10)));
       });
       
       return products.sort((a, b) => a.productId - b.productId);
@@ -319,23 +730,24 @@ class InventoryService {
   }
 
   // ✅ Procesar compra y reducir stock de múltiples productos
-  async processOrder(items: { productId: number; quantity: number }[]): Promise<boolean> {
-    const processedItems: { productId: number; quantity: number }[] = [];
+  async processOrder(items: { productId: number; quantity: number; sizeCode?: JerseySizeCode; versionId?: string }[]): Promise<boolean> {
+    const processedItems: { productId: number; quantity: number; sizeCode?: JerseySizeCode; versionId?: string }[] = [];
     
     try {
       // Verificar stock de todos los productos primero
       for (const item of items) {
-        const available = await this.isProductAvailable(item.productId, item.quantity);
+        const available = await this.isProductAvailable(item.productId, item.quantity, item.sizeCode, item.versionId);
         if (!available) {
-          const productStock = await this.getProductStock(item.productId);
-          throw new Error(`Stock insuficiente para producto ${item.productId}. Stock disponible: ${productStock}, cantidad solicitada: ${item.quantity}`);
+          const productStock = await this.getProductStock(item.productId, item.sizeCode, item.versionId);
+          const sizeLabel = item.sizeCode ? ` (${jerseySizeLabel(item.sizeCode)})` : '';
+          throw new Error(`Stock insuficiente para producto ${item.productId}${sizeLabel}. Stock disponible: ${productStock}, cantidad solicitada: ${item.quantity}`);
         }
       }
       
       // Si todo está disponible, reducir stock uno por uno
       for (const item of items) {
         try {
-          await this.reduceStock(item.productId, item.quantity);
+          await this.reduceStock(item.productId, item.quantity, item.sizeCode, item.versionId);
           processedItems.push(item);
         } catch (error) {
           console.error(`❌ Error reduciendo stock para producto ${item.productId}:`, error);
@@ -343,7 +755,7 @@ class InventoryService {
           // Revertir cambios si algo falla a mitad del proceso
           for (const processedItem of processedItems) {
             try {
-              await this.addStock(processedItem.productId, processedItem.quantity);
+              await this.addStock(processedItem.productId, processedItem.quantity, processedItem.sizeCode, processedItem.versionId);
               console.log(`↩️ Stock revertido para producto ${processedItem.productId}: ${processedItem.quantity} unidades`);
             } catch (revertError) {
               console.error(`❌ Error revirtiendo stock para producto ${processedItem.productId}:`, revertError);

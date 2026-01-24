@@ -11,6 +11,7 @@ import TopbarMobile from '../../components/TopbarMobile';
 import Footer from '../../components/Footer';
 import ProductFormModal from '../../components/ProductFormModal';
 import Select from 'react-select';
+import { type JerseySizeCode, jerseySizeLabel, JERSEY_SIZE_OPTIONS } from '../../constants/jersey';
 
 
 // Componente simple de protección local
@@ -55,12 +56,21 @@ export default function InventoryManagementPage() {
   const [showProductModal, setShowProductModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<ProductInventory | null>(null);
   const [stockChange, setStockChange] = useState<number>(0);
+  const [selectedSizeCode, setSelectedSizeCode] = useState<JerseySizeCode>(JERSEY_SIZE_OPTIONS[0].code);
   const [actionType, setActionType] = useState<'add' | 'reduce'>('add');
   const [message, setMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
   
   // 🔍 Estados para el buscador
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStock, setFilterStock] = useState<'all' | 'inStock' | 'lowStock' | 'outOfStock'>('all');
+
+  const productHasSizeBreakdown = !!(selectedProduct?.sizeStocks && selectedProduct.sizeStocks.length > 0);
+  const currentSelectedSizeStock = productHasSizeBreakdown
+    ? selectedProduct?.sizeStocks?.find((size) => size.code === selectedSizeCode)
+    : undefined;
+  const maxStockReduction = productHasSizeBreakdown
+    ? currentSelectedSizeStock?.quantity ?? 0
+    : selectedProduct?.stock ?? 0;
 
   useEffect(() => {
     if (user && isAdmin) {
@@ -115,12 +125,15 @@ export default function InventoryManagementPage() {
     if (!selectedProduct || stockChange === 0) return;
 
     try {
+      const hasSizeConfiguration = selectedProduct.sizeStocks && selectedProduct.sizeStocks.length > 0;
+      const sizeArg = hasSizeConfiguration ? selectedSizeCode : undefined;
+
       let success = false;
       
       if (actionType === 'add') {
-        success = await inventoryService.addStock(selectedProduct.productId, Math.abs(stockChange));
+        success = await inventoryService.addStock(selectedProduct.productId, Math.abs(stockChange), sizeArg);
       } else if (actionType === 'reduce') {
-        success = await inventoryService.reduceStock(selectedProduct.productId, Math.abs(stockChange));
+        success = await inventoryService.reduceStock(selectedProduct.productId, Math.abs(stockChange), sizeArg);
       }
 
       if (success) {
@@ -159,6 +172,10 @@ export default function InventoryManagementPage() {
     setSelectedProduct(product);
     setActionType(action);
     setStockChange(0);
+    const defaultSize = product.sizeStocks && product.sizeStocks.length > 0
+      ? product.sizeStocks[0].code
+      : JERSEY_SIZE_OPTIONS[0].code;
+    setSelectedSizeCode(defaultSize as JerseySizeCode);
     setShowStockModal(true);
   };
 
@@ -480,11 +497,11 @@ export default function InventoryManagementPage() {
                 <Alert variant="info">
                   <div className="d-flex align-items-center">
                     {selectedProduct.images && selectedProduct.images.length > 0 && (
-                      <img 
-                        src={selectedProduct.images[0]} 
+                      <img
+                        src={selectedProduct.images[0]}
                         alt={selectedProduct.name}
-                        width="50" 
-                        height="50" 
+                        width="50"
+                        height="50"
                         className="rounded me-3"
                         style={{ objectFit: 'cover' }}
                       />
@@ -492,11 +509,36 @@ export default function InventoryManagementPage() {
                     <div>
                       <strong>{selectedProduct.name}</strong>
                       <br />
-                      <small className="text-muted">Stock actual: {selectedProduct.stock} unidades</small>
+                      {productHasSizeBreakdown ? (
+                        <small className="text-muted">
+                          Stock total: {selectedProduct.stock} unidades · Talla seleccionada: {jerseySizeLabel(selectedSizeCode)} ({currentSelectedSizeStock?.quantity ?? 0} uds.)
+                        </small>
+                      ) : (
+                        <small className="text-muted">Stock actual: {selectedProduct.stock} unidades</small>
+                      )}
                     </div>
                   </div>
                 </Alert>
-                
+
+                {productHasSizeBreakdown && (
+                  <Form.Group className="mb-3">
+                    <Form.Label>Talla que deseas ajustar</Form.Label>
+                    <Form.Select
+                      value={selectedSizeCode}
+                      onChange={(e) => setSelectedSizeCode(e.target.value as JerseySizeCode)}
+                    >
+                      {selectedProduct.sizeStocks?.map((size) => (
+                        <option key={size.code} value={size.code}>
+                          {jerseySizeLabel(size.code)} — {size.quantity} unidades en inventario
+                        </option>
+                      ))}
+                    </Form.Select>
+                    <Form.Text className="text-muted">
+                      Ajustarás el stock de la talla {jerseySizeLabel(selectedSizeCode)}.
+                    </Form.Text>
+                  </Form.Group>
+                )}
+
                 <Form.Group>
                   <Form.Label>
                     <i className={`bi bi-${actionType === 'add' ? 'plus' : 'dash'} me-2`}></i>
@@ -505,14 +547,14 @@ export default function InventoryManagementPage() {
                   <Form.Control
                     type="number"
                     min="1"
-                    max={actionType === 'reduce' ? selectedProduct.stock : undefined}
+                    max={actionType === 'reduce' ? maxStockReduction : undefined}
                     value={stockChange}
                     onChange={(e) => setStockChange(parseInt(e.target.value) || 0)}
                     placeholder="Ingresa la cantidad"
                   />
-                  {actionType === 'reduce' && stockChange > selectedProduct.stock && (
+                  {actionType === 'reduce' && stockChange > maxStockReduction && (
                     <Form.Text className="text-danger">
-                      No puedes reducir más stock del disponible
+                      No puedes reducir más unidades de las disponibles para esta selección.
                     </Form.Text>
                   )}
                 </Form.Group>
@@ -527,7 +569,7 @@ export default function InventoryManagementPage() {
             <Button 
               variant={actionType === 'add' ? 'success' : 'warning'} 
               onClick={handleStockChange}
-              disabled={stockChange <= 0 || (actionType === 'reduce' && stockChange > (selectedProduct?.stock || 0))}
+              disabled={stockChange <= 0 || (actionType === 'reduce' && stockChange > maxStockReduction)}
             >
               <i className={`bi bi-${actionType === 'add' ? 'plus' : 'dash'} me-2`}></i>
               {actionType === 'add' ? 'Agregar Stock' : 'Reducir Stock'}

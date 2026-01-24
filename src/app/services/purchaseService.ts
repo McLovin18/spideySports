@@ -7,6 +7,61 @@ import { SecureLogger } from '../utils/security';
 import { inventoryService } from './inventoryService';
 import { couponService } from './couponService';
 import { userNotificationService } from './userNotificationService';
+import { type JerseySizeCode } from '../constants/jersey';
+
+// 🔧 Eliminar valores undefined antes de enviar datos a Firestore
+export const sanitizeForFirestore = (value: any): any => {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => sanitizeForFirestore(item))
+      .filter((item) => item !== undefined);
+  }
+
+  if (value !== null && typeof value === 'object') {
+    const sanitized: Record<string, any> = {};
+    Object.entries(value).forEach(([key, entry]) => {
+      if (entry === undefined) {
+        return;
+      }
+      const sanitizedValue = sanitizeForFirestore(entry);
+      if (sanitizedValue !== undefined) {
+        sanitized[key] = sanitizedValue;
+      }
+    });
+    return sanitized;
+  }
+
+  return value === undefined ? undefined : value;
+};
+
+const findUndefinedPath = (value: any, currentPath: string[] = []): string | null => {
+  if (value === undefined) {
+    return currentPath.join('.') || '(root)';
+  }
+
+  if (value === null || typeof value !== 'object') {
+    return null;
+  }
+
+  if (Array.isArray(value)) {
+    for (let index = 0; index < value.length; index++) {
+      const result = findUndefinedPath(value[index], [...currentPath, String(index)]);
+      if (result) {
+        return result;
+      }
+    }
+    return null;
+  }
+
+  for (const [key, entry] of Object.entries(value)) {
+    const result = findUndefinedPath(entry, [...currentPath, key]);
+    if (result) {
+      return result;
+    }
+  }
+
+  return null;
+};
 
 // Definición de tipos
 export interface PurchaseItem {
@@ -15,6 +70,24 @@ export interface PurchaseItem {
   price: number;
   quantity: number;
   image: string;
+  sizeCode?: JerseySizeCode;
+  sizeLabel?: string;
+  versionId?: string;
+  versionLabel?: string;
+}
+
+export interface PricingAdjustments {
+  coupon?: number;
+  quizDiscount?: number;
+  quizPenalty?: number;
+}
+
+export interface TriviaResultSummary {
+  question: string;
+  result: 'correct' | 'incorrect';
+  discountApplied?: boolean;
+  discountAmount?: number;
+  penaltyAmount?: number;
 }
 
 export interface Purchase {
@@ -27,6 +100,8 @@ export interface Purchase {
   customerCode?: string; // ID de cliente de 7 dígitos
   orderNumber?: string;  // ID de pedido por cliente (5 dígitos)
   fullOrderId?: string;  // ID global: customerCode + orderNumber
+  pricingAdjustments?: PricingAdjustments;
+  triviaResult?: TriviaResultSummary;
 }
 
 export interface DailyOrder {
@@ -42,6 +117,8 @@ export interface DailyOrder {
   customerCode?: string;
   orderNumber?: string;
   fullOrderId?: string;
+  pricingAdjustments?: PricingAdjustments;
+  triviaResult?: TriviaResultSummary;
 }
 
 export interface DailyOrdersDocument {
@@ -208,7 +285,9 @@ export const savePurchase = async (
     await inventoryService.processOrder(
       purchase.items.map(item => ({
         productId: parseInt(item.id),
-        quantity: item.quantity
+        quantity: item.quantity,
+        sizeCode: item.sizeCode,
+        versionId: item.versionId
       }))
     );
 
@@ -233,7 +312,16 @@ export const savePurchase = async (
     if (orderNumber) purchaseDocData.orderNumber = orderNumber;
     if (fullOrderId) purchaseDocData.fullOrderId = fullOrderId;
 
-    await setDoc(tempDocRef, purchaseDocData);
+    const sanitizedPurchaseDocData = sanitizeForFirestore(purchaseDocData);
+
+    if (process.env.NODE_ENV !== 'production') {
+      const undefinedPath = findUndefinedPath(sanitizedPurchaseDocData);
+      if (undefinedPath) {
+        console.warn('[savePurchase] Datos contienen undefined tras sanitizar en', undefinedPath);
+      }
+    }
+
+    await setDoc(tempDocRef, sanitizedPurchaseDocData);
 
     // Guardar en dailyOrders solo si hay usuario autenticado
     if (!isGuest) {
@@ -256,12 +344,23 @@ export const savePurchase = async (
           ...(customerCode ? { customerCode } : {}),
           ...(orderNumber ? { orderNumber } : {}),
           ...(fullOrderId ? { fullOrderId } : {}),
+          ...(purchase.pricingAdjustments ? { pricingAdjustments: purchase.pricingAdjustments } : {}),
+          ...(purchase.triviaResult ? { triviaResult: purchase.triviaResult } : {}),
         };
+
+        const sanitizedOrderData = sanitizeForFirestore(orderData);
+
+        if (process.env.NODE_ENV !== 'production') {
+          const undefinedPath = findUndefinedPath(sanitizedOrderData);
+          if (undefinedPath) {
+            console.warn('[savePurchase] dailyOrder contiene undefined tras sanitizar en', undefinedPath);
+          }
+        }
 
         await setDoc(
           dailyOrderRef,
           {
-            orders: arrayUnion(orderData),
+            orders: arrayUnion(sanitizedOrderData),
             totalOrdersCount: increment(1),
             totalDayAmount: increment(purchase.total),
             lastUpdated: currentDate.toISOString()

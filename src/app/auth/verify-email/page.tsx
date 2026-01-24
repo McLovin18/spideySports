@@ -21,21 +21,22 @@ const VerifyEmail = () => {
   };
 
   return (
-    <main className="d-flex align-items-center justify-content-center min-vh-100 bg-light">
-      <Card className="p-4 shadow border-0 w-100" style={{ maxWidth: 400 }}>
-        <h3 className="fw-bold text-center mb-3">Verifica tu correo</h3>
-        <p className="text-center">
-          Te hemos enviado un correo de verificación. Por favor revisa tu bandeja de entrada y confirma tu cuenta antes de continuar.
-        </p>
+    <main className="auth-page">
+      <Card className="auth-card shadow-lg border-0">
+        <div className="auth-card-header text-center mb-4">
+          <span className="auth-tagline">SpideySports Matchday</span>
+          <h3 className="auth-title">Verifica tu correo</h3>
+          <p className="auth-subtitle">Confirma tu cuenta para desbloquear fichajes, listas personalizadas y alertas de drops.</p>
+        </div>
 
-        {message && <Alert variant="success">{message}</Alert>}
+        {message && <Alert variant="success" className="auth-alert">{message}</Alert>}
 
-        <Button variant="dark" className="w-100 mb-3" onClick={handleResend}>
-          Reenviar correo
+        <Button variant="primary" className="w-100 mb-3" onClick={handleResend}>
+          Reenviar correo de verificación
         </Button>
 
-        <Button variant="success" className="w-100" onClick={goToLogin}>
-          Verificado, iniciar sesión
+        <Button variant="outline-light" className="w-100" onClick={goToLogin}>
+          Ya verifiqué, iniciar sesión
         </Button>
       </Card>
     </main>

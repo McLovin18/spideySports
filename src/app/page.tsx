@@ -33,24 +33,40 @@ export default function Home() {
   const [loadingSeasonal, setLoadingSeasonal] = useState(false);
 
 
-  const imagenes = [
-    { 
-      src: "/banner.jpg",
-      alt: "Engrapadora y útiles de oficina",
-      titulo: "Útiles de oficina esenciales",
-      descripcion: "Cuadernos, hojas, libretas y todo lo que necesitas en tu día a día.",
-      botonTexto: "Explorar ahora",
-      botonLink: "#productosDestacados"
+  const heroSlides = [
+    {
+      id: 'club-kits',
+      src: '/hero-club-kits.svg',
+      alt: 'Camisetas oficiales de clubes europeos',
+      badge: 'Colección 24/25',
+      titulo: 'Vístete como tu club',
+      descripcion: 'Jerseys oficiales de Premier League, LaLiga, Serie A y Bundesliga con parches auténticos y tallas completas.',
+      botonTexto: 'Explorar Clubes',
+      botonLink: '/categories/premier-league',
+      accent: '#037b90'
     },
-    { 
-      src: "/banner2.jpg",
-      alt: "Ofertas en suministros de oficina",
-      titulo: "Compra lo que necesites de suministro y más aquí",
-      descripcion: "Artículos a muy buen precio, que necesitas para la escuela o trabajo.",
-      botonTexto: "Comprar ya",
-      botonLink: "/products"
-
+    {
+      id: 'national-teams',
+      src: '/coleccionSelecciones.png',
+      alt: 'Selecciones nacionales de fútbol',
+      badge: 'Nuevas Selecciones',
+      titulo: 'Orgullo de tu país',
+      descripcion: 'Equipaciones de selecciones nacionales UEFA, CONMEBOL y Concacaf listas para la próxima ventana internacional.',
+      botonTexto: 'Ver Selecciones',
+      botonLink: '/categories/americas',
+      accent: '#f2a65a'
     },
+    {
+      id: 'retro-legends',
+      src: '/hero-retro-legends.svg',
+      alt: 'Camisetas retro históricas',
+      badge: 'Leyendas Retro',
+      titulo: 'Revive noches históricas',
+      descripcion: 'Ediciones clásicas de los 80s, 90s y 2000s con tejidos premium y detalles coleccionables.',
+      botonTexto: 'Colección Retro',
+      botonLink: '/categories/retro-90s',
+      accent: '#900000'
+    }
   ];
   
   // 🔥 USAR EL HOOK OPTIMIZADO para productos con stock
@@ -166,47 +182,36 @@ export default function Home() {
   // Página para usuarios no autenticados (similar a la imagen de referencia)
   const UnauthenticatedHome = () => (
     <div className="d-flex flex-column min-vh-100" style={{backgroundColor: "var(--cosmetic-secondary)"}}>
-      <Carousel className="mb-4" controls={true} indicators={true} interval={null}>
-        {imagenes.map((img, index) => (
-          <Carousel.Item key={index}>
-            <div style={{ height: '500px', position: 'relative' }}>
-              <Image 
-                src={img.src}
-                alt={img.alt} 
-                fill 
+      <Carousel className="mb-4 hero-carousel" controls indicators interval={8000}>
+        {heroSlides.map((slide) => (
+          <Carousel.Item key={slide.id}>
+            <div className="hero-slide position-relative">
+              <Image
+                src={slide.src}
+                alt={slide.alt}
+                fill
+                priority
+                sizes="(max-width: 992px) 100vw, 1200px"
                 style={{ objectFit: 'cover' }}
               />
 
-              {/* Overlay marrón con opacidad */}
-              <div 
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  height: '100%',
-                  backgroundColor: 'rgba(139, 69, 19, 0.5)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  padding: '0 2rem'
-                }}
-              >
-                <div className="text-start text-white">
-                  <h2 className="display-4 fw-bold">{img.titulo}</h2>
-                  <p className="lead">{img.descripcion}</p>
+              <div className="hero-overlay d-flex align-items-center">
+                <div className="hero-content text-start text-white">
+                  <span className="hero-badge" style={{ backgroundColor: slide.accent }}>{slide.badge}</span>
+                  <h2 className="display-5 fw-bold mt-3">{slide.titulo}</h2>
+                  <p className="lead mb-4 text-white-50">{slide.descripcion}</p>
                   <Button
-                  onClick={() => router.push(img.botonLink)} // 👈 Aquí usamos el link
-
-                   variant="cosmetic-primary" size="lg" className="bg-cosmetic-primary mt-3">
-
-                    {img.botonTexto}
+                    onClick={() => router.push(slide.botonLink)}
+                    className="hero-cta"
+                    style={{ backgroundColor: slide.accent, borderColor: slide.accent }}
+                  >
+                    {slide.botonTexto}
                   </Button>
                 </div>
               </div>
             </div>
           </Carousel.Item>
-
-        ))} 
+        ))}
       </Carousel>
 
       
@@ -218,13 +223,13 @@ export default function Home() {
 
       {/* Sección de descuentos de temporada (solo si hay campaña activa) */}
       {discountedProducts.length > 0 && (
-        <Container className="py-4" style={{ backgroundColor: "var(--cosmetic-secondary)" }}>
+        <Container className="py-4" style={{ backgroundColor: "var(--spidey-bg)" }}>
           <div
             className="shadow-sm mx-auto"
             style={{
               borderRadius: '1.5rem',
-              background: 'linear-gradient(135deg, #ffe9e0 0%, #fff 60%, #ffe9e0 100%)',
-              border: '1px solid rgba(0,0,0,0.04)',
+              background: 'linear-gradient(135deg, rgba(3,24,27,0.92) 0%, rgba(3,123,144,0.25) 55%, rgba(144,0,0,0.25) 100%)',
+              border: '1px solid rgba(3,123,144,0.2)',
               padding: '1.6rem 1.8rem',
               maxWidth: '1120px'
             }}
@@ -234,7 +239,7 @@ export default function Home() {
                 <h2
                   className="fw-bold mb-0"
                   style={{
-                    color: 'var(--cosmetic-primary)',
+                    color: 'var(--spidey-heading)',
                     fontSize: '1.9rem',
                     letterSpacing: '0.03em'
                   }}
@@ -258,7 +263,7 @@ export default function Home() {
                         width: 'auto',
                         height: '260px',
                         margin: '0 auto',
-                        background: '#fff',
+                        background: 'rgba(3,24,27,0.75)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -273,7 +278,7 @@ export default function Home() {
                             top: '0.5rem',
                             right: '0.5rem',
                             transform: 'rotate(8deg)',
-                            backgroundColor: '#e53935',
+                            backgroundColor: 'rgba(144, 0, 0, 0.9)',
                             color: '#fff',
                             padding: '0.45rem 1.7rem',
                             borderRadius: '0.7rem',
@@ -321,21 +326,21 @@ export default function Home() {
                       )}
                     </div>
 
-                    <Card.Body className="text-center">
-                      <Card.Title className="h6 mb-2" style={{ color: "var(--cosmetic-tertiary)" }}>
+                      <Card.Body className="text-center">
+                        <Card.Title className="h6 mb-2" style={{ color: 'var(--spidey-heading)' }}>
                         {product.name}
                       </Card.Title>
                       {product.discountedPrice !== undefined && product.discountPercent ? (
                         <>
-                          <Card.Text className="mb-1" style={{ textDecoration: 'line-through', color: '#888' }}>
+                            <Card.Text className="mb-1" style={{ textDecoration: 'line-through', color: 'rgba(255,255,255,0.4)' }}>
                             ${product.price.toFixed(2)}
                           </Card.Text>
-                          <Card.Text className="fw-bold mb-2" style={{ color: "var(--cosmetic-primary)", fontSize: '1.2rem' }}>
+                            <Card.Text className="fw-bold mb-2" style={{ color: "var(--spidey-primary)", fontSize: '1.2rem' }}>
                             ${product.discountedPrice.toFixed(2)}
                           </Card.Text>
                         </>
                       ) : (
-                        <Card.Text className="fw-bold mb-2" style={{ color: "var(--cosmetic-primary)", fontSize: '1.2rem' }}>
+                          <Card.Text className="fw-bold mb-2" style={{ color: "var(--spidey-primary)", fontSize: '1.2rem' }}>
                           ${product.price.toFixed(2)}
                         </Card.Text>
                       )}
@@ -349,7 +354,7 @@ export default function Home() {
               <Button
                 onClick={() => router.push('/products')}
                 className="rounded-1 px-4"
-                style={{ backgroundColor: "var(--cosmetic-primary)" }}
+                style={{ backgroundColor: 'var(--spidey-primary)', borderColor: 'var(--spidey-primary)' }}
               >
                 Ver productos
               </Button>
@@ -359,22 +364,22 @@ export default function Home() {
       )}
 
       {/* Sección de productos destacados */}
-      <Container id='productosDestacados' className="py-5" style={{ backgroundColor: "var(--cosmetic-secondary)" }}>
-        <h2 className="text-center mb-4 fw-bold" style={{fontSize: "2rem", color: "var(--cosmetic-tertiary)" }}>Productos Destacados</h2>
+      <Container id='jerseysDestacados' className="py-5" style={{ backgroundColor: "var(--spidey-bg)" }}>
+        <h2 className="text-center mb-4 fw-bold" style={{fontSize: "2rem", color: "var(--spidey-heading)" }}>Jerseys Destacados</h2>
         {loadingProducts ? (
           <Row className="justify-content-center">
             <Col xs={12} className="text-center py-5">
-              <Spinner animation="border" style={{ color: "var(--cosmetic-primary)" }} />
-              <h4 className="mt-3" style={{ color: "var(--cosmetic-tertiary)" }}>Cargando productos destacados...</h4>
-              <p style={{ color: "var(--cosmetic-tertiary-light)" }}>Verificando stock disponible</p>
+              <Spinner animation="border" style={{ color: "var(--spidey-primary)" }} />
+              <h4 className="mt-3" style={{ color: "var(--spidey-heading)" }}>Cargando jerseys destacados...</h4>
+              <p style={{ color: "var(--spidey-text-muted)" }}>Verificando stock disponible</p>
             </Col>
           </Row>
         ) : featuredProducts.length === 0 ? (
           <Row className="justify-content-center">
             <Col xs={12} className="text-center py-5">
-              <i className="bi bi-emoji-frown" style={{ fontSize: "2.5rem", color: "var(--cosmetic-accent)" }}></i>
-              <h4 className="mt-3" style={{ color: "var(--cosmetic-tertiary)" }}>No hay productos destacados disponibles</h4>
-              <p style={{ color: "var(--cosmetic-tertiary-light)" }}>Todos los productos destacados están agotados</p>
+              <i className="bi bi-emoji-frown" style={{ fontSize: "2.5rem", color: "var(--spidey-danger)" }}></i>
+              <h4 className="mt-3" style={{ color: "var(--spidey-heading)" }}>No hay jerseys destacados disponibles</h4>
+              <p style={{ color: "var(--spidey-text-muted)" }}>Todos los jerseys destacados están agotados</p>
             </Col>
           </Row>
         ) : (
@@ -393,6 +398,7 @@ export default function Home() {
                       height: '300px',
                       margin: '0 auto',
                       background: '#fff',
+                      background: 'rgba(3,24,27,0.75)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -417,10 +423,10 @@ export default function Home() {
                   </div>
                   
                   <Card.Body className="text-center">
-                    <Card.Title className="h6 mb-2" style={{ color: "var(--cosmetic-tertiary)" }}>
+                    <Card.Title className="h6 mb-2" style={{ color: "var(--spidey-heading)" }}>
                       {product.name}
                     </Card.Title>
-                    <Card.Text className="fw-bold mb-2" style={{ color: "var(--cosmetic-primary)", fontSize: "1.2rem" }}>
+                    <Card.Text className="fw-bold mb-2" style={{ color: "var(--spidey-primary)", fontSize: "1.2rem" }}>
                       ${product.price.toFixed(2)}
                     </Card.Text>
                   </Card.Body>
@@ -433,8 +439,8 @@ export default function Home() {
         {!loadingProducts && featuredProducts.length > 0 && (
           <div className="text-center mt-4">
             <Link href="/products" passHref>
-              <Button className="rounded-1 px-4" style={{backgroundColor: "var(--cosmetic-primary)"}}>
-                Ver todos los productos
+              <Button className="rounded-1 px-4" style={{backgroundColor: "var(--spidey-primary)", borderColor: "var(--spidey-primary)"}}>
+                Ver todos los jerseys
               </Button>
             </Link>
           </div>
@@ -462,7 +468,7 @@ export default function Home() {
           <Container className="py-2 py-lg-5 py-md-2 py-sm-2">
             <div className="flex flex-col items-center text-center">
               <h1 className="font-bold text-cosmetic-tertiary text-2xl md:text-3xl">
-                Bienvenido a
+                Bienvenido de vuelta a
               </h1>
 
               <div className="flex flex-col md:flex-row items-center justify-center">
@@ -470,32 +476,32 @@ export default function Home() {
                   className={`${drSugiyama.className} font-bold text-cosmetic-tertiary
                   text-5xl md:text-6xl lg:text-7xl leading-none px-2`}
                 >
-                  Tiffany's
+                  SpideySports
                 </h1>
 
                 <h1 className="font-bold text-cosmetic-tertiary
                   text-xl md:text-2xl lg:text-3xl leading-tight mt-2 md:mt-0">
-                  suministros y variedades
+                  jerseys oficiales & retro
                 </h1>
               </div>
             </div>
 
-            <h3 className="fw-bold text-center mt-5" style={{fontSize:"2.8em", color: "var(--cosmetic-primary)" }}>Productos destacados</h3>
+            <h3 className="fw-bold text-center mt-5" style={{fontSize:"2.6em", color: "var(--spidey-heading)" }}>Jerseys destacados</h3>
 
             {loadingProducts ? (
               <Row className="justify-content-center">
                 <Col xs={12} className="text-center py-5">
-                  <Spinner animation="border" style={{ color: "var(--cosmetic-primary)" }} />
-                  <h4 className="mt-3" style={{ color: "var(--cosmetic-tertiary)" }}>Cargando productos destacados...</h4>
-                  <p style={{ color: "var(--cosmetic-tertiary-light)" }}>Verificando stock disponible</p>
+                  <Spinner animation="border" style={{ color: "var(--spidey-primary)" }} />
+                  <h4 className="mt-3" style={{ color: "var(--spidey-heading)" }}>Cargando jerseys destacados...</h4>
+                  <p style={{ color: "var(--spidey-text-muted)" }}>Verificando stock disponible</p>
                 </Col>
               </Row>
             ) : featuredProducts.length === 0 ? (
               <Row className="justify-content-center">
                 <Col xs={12} className="text-center py-5">
-                  <i className="bi bi-emoji-frown" style={{ fontSize: "2.5rem", color: "var(--cosmetic-accent)" }}></i>
-                  <h4 className="mt-3" style={{ color: "var(--cosmetic-tertiary)" }}>No hay productos destacados disponibles</h4>
-                  <p style={{ color: "var(--cosmetic-tertiary-light)" }}>Todos los productos destacados están agotados</p>
+                  <i className="bi bi-emoji-frown" style={{ fontSize: "2.5rem", color: "var(--spidey-danger)" }}></i>
+                  <h4 className="mt-3" style={{ color: "var(--spidey-heading)" }}>No hay jerseys destacados disponibles</h4>
+                  <p style={{ color: "var(--spidey-text-muted)" }}>Todos los jerseys destacados están agotados</p>
                 </Col>
               </Row>
             ) : (
@@ -526,7 +532,7 @@ export default function Home() {
                           width: 'auto',
                           height: '300px',
                           margin: '0 auto',
-                          background: '#fff',
+                          background: 'rgba(3,24,27,0.75)',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -553,10 +559,10 @@ export default function Home() {
                       {/* Información del Producto */}
                       <Card.Body className="d-flex flex-column justify-content-between">
                         <div>
-                          <Card.Title className="fw-bold h6 mb-2" style={{ lineHeight: '1.3', color: "var(--cosmetic-tertiary)" }}>
+                          <Card.Title className="fw-bold h6 mb-2" style={{ lineHeight: '1.3', color: "var(--spidey-heading)" }}>
                             {product.name}
                           </Card.Title>
-                          <Card.Text className="fw-bold fs-5 mb-2" style={{ color: "var(--cosmetic-primary)" }}>
+                          <Card.Text className="fw-bold fs-5 mb-2" style={{ color: "var(--spidey-primary)" }}>
                             ${product.price.toFixed(2)}
                           </Card.Text>
                         </div>

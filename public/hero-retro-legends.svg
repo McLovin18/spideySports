@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1200" height="700" viewBox="0 0 1200 700" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="retro-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#03181B"/>
+      <stop offset="70%" stop-color="#220C15"/>
+      <stop offset="100%" stop-color="#900000"/>
+    </linearGradient>
+    <linearGradient id="retro-body" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#53121F"/>
+      <stop offset="100%" stop-color="#A01F2F"/>
+    </linearGradient>
+    <linearGradient id="retro-sleeve" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#3A101A"/>
+      <stop offset="100%" stop-color="#7A1F2C"/>
+    </linearGradient>
+    <linearGradient id="retro-collar" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#F2A65A"/>
+      <stop offset="100%" stop-color="#F9CD8E"/>
+    </linearGradient>
+    <linearGradient id="retro-stripe" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.6)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0.08)"/>
+    </linearGradient>
+    <pattern id="retro-grid" width="64" height="64" patternUnits="userSpaceOnUse" patternTransform="rotate(15)">
+      <path d="M0 0L64 0 64 64" stroke="rgba(144,0,0,0.18)" stroke-width="2" fill="none"/>
+    </pattern>
+    <filter id="retro-shadow" x="360" y="20" width="720" height="620" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feGaussianBlur in="BackgroundImageFix" stdDeviation="18"/>
+      <feComposite in2="SourceAlpha" operator="in" result="effect1_backgroundBlur"/>
+      <feBlend in="SourceGraphic" in2="effect1_backgroundBlur" mode="normal" result="shape"/>
+      <feDropShadow dx="0" dy="22" stdDeviation="34" flood-color="rgba(0,0,0,0.28)"/>
+    </filter>
+  </defs>
+  <rect width="1200" height="700" rx="38" fill="url(#retro-bg)"/>
+  <rect width="1200" height="700" rx="38" fill="url(#retro-grid)" opacity="0.22"/>
+  <g filter="url(#retro-shadow)">
+    <path d="M676 108L728 60L848 60L900 108H988L950 208C946 218 944 230 944 242V540C944 554 932 566 916 566H640C624 566 612 554 612 540V242C612 230 610 218 606 208L568 108H656L676 108Z" fill="url(#retro-body)"/>
+    <path d="M656 108L708 64L752 34C768 24 796 24 812 34L856 64L900 108H888L836 60H740L688 108H656Z" fill="url(#retro-sleeve)"/>
+    <path d="M568 108L606 208C610 218 612 230 612 242V540C612 554 624 566 640 566H532C516 566 504 554 504 540V230C504 218 498 208 488 200L430 154L470 108H568Z" fill="url(#retro-sleeve)"/>
+    <path d="M944 242C944 230 946 218 950 208L988 108H1072L1034 178C1024 196 1018 216 1018 236V540C1018 554 1006 566 990 566H916C932 566 944 554 944 540V242Z" fill="url(#retro-sleeve)"/>
+    <path d="M732 108H812C828 108 840 96 840 80V66H704V80C704 96 716 108 732 108Z" fill="url(#retro-collar)"/>
+    <path d="M640 520L912 184V280L640 616V520Z" fill="url(#retro-stripe)" opacity="0.6"/>
+    <path d="M716 188H828C836 188 842 194 842 202V220H702V202C702 194 708 188 716 188Z" fill="rgba(255,255,255,0.08)"/>
+    <path d="M762 150C780 150 794 164 794 182C794 200 780 214 762 214C744 214 730 200 730 182C730 164 744 150 762 150Z" fill="rgba(255,255,255,0.12)"/>
+  </g>
+  <g opacity="0.3">
+    <path d="M190 200C270 140 370 140 450 200" stroke="rgba(247,208,96,0.24)" stroke-width="2" fill="none"/>
+    <path d="M210 262C280 210 360 210 430 262" stroke="rgba(144,0,0,0.26)" stroke-width="2" fill="none"/>
+    <path d="M236 324C296 282 364 282 424 324" stroke="rgba(247,208,96,0.2)" stroke-width="2" fill="none"/>
+    <circle cx="320" cy="420" r="130" stroke="rgba(144,0,0,0.28)" stroke-width="2" fill="none"/>
+  </g>
+</svg>

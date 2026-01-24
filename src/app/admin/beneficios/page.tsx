@@ -14,6 +14,13 @@ import {
   SEASONAL_DISCOUNT_REASONS,
   type SeasonalDiscountConfig,
 } from '../../services/seasonalDiscountService';
+import {
+  getQuizDiscountConfig,
+  saveQuizDiscountConfig,
+  QUIZ_DISCOUNT_REASONS,
+  getQuizQuestionSet,
+  type QuizDiscountReason,
+} from '../../services/quizDiscountService';
 import { couponService, type AutoCouponConfig, type Coupon } from '../../services/couponService';
 import { userNotificationService } from '../../services/userNotificationService';
 import { DailyOrder, DailyOrdersDocument, getAllOrderDays } from '../../services/purchaseService';
@@ -33,7 +40,7 @@ const BeneficiosPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  const [activeTab, setActiveTab] = useState<'seasonal' | 'coupons'>('seasonal');
+  const [activeTab, setActiveTab] = useState<'seasonal' | 'coupons' | 'quiz'>('seasonal');
 
   const [isActive, setIsActive] = useState(false);
   const [reason, setReason] = useState(SEASONAL_DISCOUNT_REASONS[0].value);
@@ -42,6 +49,15 @@ const BeneficiosPage: React.FC = () => {
   const [products, setProducts] = useState<ProductWithDiscount[]>([]);
   const [productDiscounts, setProductDiscounts] = useState<Record<number, number>>({});
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Estado para quiz de descuento
+  const [quizIsActive, setQuizIsActive] = useState(false);
+  const [quizReason, setQuizReason] = useState<QuizDiscountReason>('champions');
+  const [quizStartDate, setQuizStartDate] = useState('');
+  const [quizEndDate, setQuizEndDate] = useState('');
+  const [quizDiscountPercent, setQuizDiscountPercent] = useState(10);
+  const [quizPenaltyFee, setQuizPenaltyFee] = useState(2);
+  const [savingQuiz, setSavingQuiz] = useState(false);
 
   // Estado para cupones
   const [autoCouponConfig, setAutoCouponConfig] = useState<AutoCouponConfig | null>(null);
@@ -56,6 +72,43 @@ const BeneficiosPage: React.FC = () => {
   }[]>([]);
   const [loadingCustomers, setLoadingCustomers] = useState(false);
   const [manualCouponPercent, setManualCouponPercent] = useState(25);
+  const todayIso = useMemo(() => new Date().toISOString().split('T')[0], []);
+
+  const seasonalReasonLabel = useMemo(() => {
+    const match = SEASONAL_DISCOUNT_REASONS.find((item) => item.value === reason);
+    return match ? match.label : SEASONAL_DISCOUNT_REASONS[0].label;
+  }, [reason]);
+
+  const quizReasonLabel = useMemo(() => {
+    const match = QUIZ_DISCOUNT_REASONS.find((item) => item.value === quizReason);
+    return match ? match.label : QUIZ_DISCOUNT_REASONS[0].label;
+  }, [quizReason]);
+
+  const selectedQuizSet = useMemo(() => getQuizQuestionSet(quizReason), [quizReason]);
+
+  const seasonalIsRunning = useMemo(() => {
+    if (!isActive) return false;
+    return (!startDate || startDate <= todayIso) && (!endDate || endDate >= todayIso);
+  }, [isActive, startDate, endDate, todayIso]);
+
+  const quizIsRunning = useMemo(() => {
+    if (!quizIsActive) return false;
+    return (!quizStartDate || quizStartDate <= todayIso) && (!quizEndDate || quizEndDate >= todayIso);
+  }, [quizIsActive, quizStartDate, quizEndDate, todayIso]);
+
+  const heroReasonLabel = activeTab === 'quiz' ? quizReasonLabel : seasonalReasonLabel;
+  const heroStatusVariant = activeTab === 'quiz'
+    ? quizIsRunning ? 'success' : 'secondary'
+    : seasonalIsRunning ? 'success' : 'secondary';
+  const heroStatusBadgeClass = activeTab === 'quiz'
+    ? `hero-metric__value benefits-hero__status benefits-status-badge ${quizIsRunning ? 'is-on' : 'is-off'}`
+    : `hero-metric__value benefits-hero__status benefits-status-badge ${seasonalIsRunning ? 'is-on' : 'is-off'}`;
+  const heroStatusLabel = activeTab === 'quiz'
+    ? quizIsRunning ? 'Quiz activado (si fecha válida)' : 'Quiz desactivado'
+    : seasonalIsRunning ? 'Campaña activa (si fecha válida)' : 'Campaña desactivada';
+  const heroHint = activeTab === 'quiz'
+    ? 'Activa trivias tematicas para premiar a la hinchada.'
+    : 'Semifinales Champions · Mundial 2026 · Retro Drop Spidey';
 
   useEffect(() => {
     if (user && isAdmin) {
@@ -69,25 +122,25 @@ const BeneficiosPage: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      const [allProducts, config] = await Promise.all([
+      const [allProducts, seasonalConfig, quizConfig] = await Promise.all([
         inventoryService.getAllProducts(),
         getSeasonalDiscountConfig(),
+        getQuizDiscountConfig(),
       ]);
 
       const mappedProducts: ProductWithDiscount[] = allProducts.map((p) => ({ ...p }));
       const discounts: Record<number, number> = {};
 
-      if (config) {
-        const todayStr = new Date().toISOString().split('T')[0];
-        const isExpired = !!config.endDate && config.endDate < todayStr;
+      if (seasonalConfig) {
+        const isExpired = !!seasonalConfig.endDate && seasonalConfig.endDate < todayIso;
 
         // Si la campaña ya terminó por fecha fin, el switch se muestra desactivado
-        setIsActive(isExpired ? false : config.isActive);
-        setReason(config.reason);
-        setStartDate(config.startDate || '');
-        setEndDate(config.endDate || '');
+        setIsActive(isExpired ? false : seasonalConfig.isActive);
+        setReason(seasonalConfig.reason);
+        setStartDate(seasonalConfig.startDate || '');
+        setEndDate(seasonalConfig.endDate || '');
 
-        config.products.forEach((item) => {
+        seasonalConfig.products.forEach((item) => {
           discounts[item.productId] = item.discountPercent;
           const idx = mappedProducts.findIndex((p) => p.productId === item.productId);
           if (idx !== -1) {
@@ -95,8 +148,24 @@ const BeneficiosPage: React.FC = () => {
           }
         });
       } else {
-        const todayStr = new Date().toISOString().split('T')[0];
-        setStartDate(todayStr);
+        setStartDate(todayIso);
+      }
+
+      if (quizConfig) {
+        const quizExpired = !!quizConfig.endDate && quizConfig.endDate < todayIso;
+        setQuizIsActive(quizExpired ? false : quizConfig.isActive);
+        setQuizReason(quizConfig.reason);
+        setQuizStartDate(quizConfig.startDate || '');
+        setQuizEndDate(quizConfig.endDate || '');
+        setQuizDiscountPercent(Math.min(90, Math.max(1, Math.round(quizConfig.discountPercent || 10))));
+        setQuizPenaltyFee(Math.round(Math.max(0, quizConfig.penaltyFee) * 100) / 100);
+      } else {
+        setQuizIsActive(false);
+        setQuizReason('champions');
+        setQuizStartDate(todayIso);
+        setQuizEndDate('');
+        setQuizDiscountPercent(10);
+        setQuizPenaltyFee(2);
       }
 
       setProducts(mappedProducts);
@@ -216,7 +285,7 @@ const BeneficiosPage: React.FC = () => {
         reason,
         reasonLabel: reasonData.label,
         startDate,
-         endDate: endDate || undefined,
+        endDate: endDate || undefined,
         products: selectedProducts,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -232,7 +301,47 @@ const BeneficiosPage: React.FC = () => {
     }
   };
 
+  const handleQuizSave = async () => {
+    try {
+      setSavingQuiz(true);
+      setError(null);
+      setSuccess(null);
+
+      if (!quizStartDate) {
+        setError('Debes elegir una fecha de inicio para el quiz.');
+        return;
+      }
+
+      if (quizEndDate && quizEndDate < quizStartDate) {
+        setError('La fecha fin del quiz no puede ser anterior a la fecha de inicio.');
+        return;
+      }
+
+      const reasonData = QUIZ_DISCOUNT_REASONS.find((r) => r.value === quizReason) || QUIZ_DISCOUNT_REASONS[0];
+
+      await saveQuizDiscountConfig({
+        isActive: quizIsActive,
+        reason: quizReason,
+        reasonLabel: reasonData.label,
+        startDate: quizStartDate,
+        endDate: quizEndDate || undefined,
+        discountPercent: quizDiscountPercent,
+        penaltyFee: quizPenaltyFee,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+
+      setSuccess('Configuración del quiz guardada correctamente.');
+    } catch (err: any) {
+      console.error('Error guardando configuración del quiz:', err);
+      setError('Error al guardar la configuración del quiz.');
+    } finally {
+      setSavingQuiz(false);
+    }
+  };
+
   const isConfigLocked = !isActive;
+  const isQuizConfigLocked = !quizIsActive;
 
   if (roleLoading) {
     return (
@@ -269,30 +378,55 @@ const BeneficiosPage: React.FC = () => {
       <div className="flex-grow-1 d-flex flex-column">
         <TopbarMobile />
 
-        <main className="flex-grow-1 py-4 px-3 px-md-4" style={{ backgroundColor: 'var(--cosmetic-bg, #f8f9fa)' }}>
+        <main className="benefits-dashboard flex-grow-1 py-4 px-3 px-md-4">
           <Container fluid>
             <Row className="mb-4">
               <Col>
-                <h2 className="mb-1">Beneficios</h2>
-                <p className="text-muted mb-2">
-                  Administra descuentos de temporada y cupones especiales para clientes frecuentes.
-                </p>
-                <ButtonGroup>
-                  <Button
-                    variant={activeTab === 'seasonal' ? 'primary' : 'outline-primary'}
-                    size="sm"
-                    onClick={() => setActiveTab('seasonal')}
-                  >
-                    Descuentos de temporada
-                  </Button>
-                  <Button
-                    variant={activeTab === 'coupons' ? 'primary' : 'outline-primary'}
-                    size="sm"
-                    onClick={() => setActiveTab('coupons')}
-                  >
-                    Cupones
-                  </Button>
-                </ButtonGroup>
+                <div className="benefits-hero">
+                  <div className="benefits-hero__header">
+                    <h2 className="benefits-hero__title">Centro de Beneficios Matchday</h2>
+                    <p className="benefits-hero__subtitle">
+                      Ajusta campañas y cupones para acompañar los momentos decisivos del calendario futbolístico.
+                    </p>
+                  </div>
+                  <div className="benefits-hero__metrics">
+                    <div className="hero-metric">
+                      <span className="hero-metric__label">Campaña seleccionada</span>
+                      <span className="hero-metric__value">{heroReasonLabel}</span>
+                    </div>
+                    <div className="hero-metric">
+                      <span className="hero-metric__label">Estado</span>
+                      <Badge bg={heroStatusVariant} className={heroStatusBadgeClass}>
+                        {heroStatusLabel}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div className="benefits-hero__actions">
+                    <span className="benefits-hero__hint">
+                      {heroHint}
+                    </span>
+                    <ButtonGroup size="sm" className="benefits-hero__tabs">
+                      <Button
+                        variant={activeTab === 'seasonal' ? 'primary' : 'outline-light'}
+                        onClick={() => setActiveTab('seasonal')}
+                      >
+                        Descuentos de temporada
+                      </Button>
+                      <Button
+                        variant={activeTab === 'quiz' ? 'primary' : 'outline-light'}
+                        onClick={() => setActiveTab('quiz')}
+                      >
+                        Quiz por descuento
+                      </Button>
+                      <Button
+                        variant={activeTab === 'coupons' ? 'primary' : 'outline-light'}
+                        onClick={() => setActiveTab('coupons')}
+                      >
+                        Cupones
+                      </Button>
+                    </ButtonGroup>
+                  </div>
+                </div>
               </Col>
             </Row>
 
@@ -313,13 +447,13 @@ const BeneficiosPage: React.FC = () => {
             )}
 
             {activeTab === 'seasonal' && (
-            <Row className="mb-4">
+              <Row className="mb-4">
               <Col lg={6} className="mb-3">
-                <Card className="shadow-sm">
-                  <Card.Header>
+                <Card className="shadow-sm benefits-card">
+                  <Card.Header className="benefits-card__header">
                     <strong>Configuración de campaña</strong>
                   </Card.Header>
-                  <Card.Body>
+                  <Card.Body className="benefits-card__body">
                     <Form.Group className="mb-3" controlId="toggleActive">
                       <Form.Check
                         type="switch"
@@ -372,7 +506,7 @@ const BeneficiosPage: React.FC = () => {
                         La sección pública mostrará un mensaje como:
                       </p>
                       <p className="mb-0 fst-italic">
-                        "Disfruta de increíbles descuentos por &lt;razón seleccionada&gt;".
+                        "Activa tu colección especial por &lt;razón seleccionada&gt; y equipa a la afición".
                       </p>
                     </div>
                   </Card.Body>
@@ -380,15 +514,18 @@ const BeneficiosPage: React.FC = () => {
               </Col>
 
               <Col lg={6} className="mb-3">
-                <Card className="shadow-sm h-100">
-                  <Card.Header>
+                <Card className="shadow-sm benefits-card h-100">
+                  <Card.Header className="benefits-card__header">
                     <strong>Resumen rápido</strong>
                   </Card.Header>
-                  <Card.Body>
+                  <Card.Body className="benefits-card__body">
                     <p className="mb-2">
                       Estado:{' '}
-                      <Badge bg={isActive ? 'success' : 'secondary'}>
-                        {isActive ? 'Campaña activa (si fecha válida)' : 'Campaña desactivada'}
+                      <Badge
+                        bg={seasonalIsRunning ? 'success' : 'secondary'}
+                        className={`benefits-status-badge ${seasonalIsRunning ? 'is-on' : 'is-off'}`}
+                      >
+                        {seasonalIsRunning ? 'Campaña activa (si fecha válida)' : 'Campaña desactivada'}
                       </Badge>
                     </p>
                     <p className="mb-1">
@@ -409,17 +546,157 @@ const BeneficiosPage: React.FC = () => {
                   </Card.Body>
                 </Card>
               </Col>
-            </Row>
+              </Row>
+            )}
+
+            {activeTab === 'quiz' && (
+              <Row className="mb-4">
+                <Col lg={6} className="mb-3">
+                  <Card className="shadow-sm benefits-card h-100">
+                    <Card.Header className="benefits-card__header">
+                      <strong>Quiz futbolero</strong>
+                    </Card.Header>
+                    <Card.Body className="benefits-card__body">
+                      <Form.Group className="mb-3" controlId="quizActive">
+                        <Form.Check
+                          type="switch"
+                          label="Activar quiz por descuento"
+                          checked={quizIsActive}
+                          onChange={(e) => setQuizIsActive(e.target.checked)}
+                        />
+                        <Form.Text className="text-muted">
+                          Habilita una trivia temática para otorgar un descuento dinámico al momento de pagar.
+                        </Form.Text>
+                      </Form.Group>
+
+                      <Row className="mb-3">
+                        <Col md={6} className="mb-3 mb-md-0">
+                          <Form.Label>Temática del quiz</Form.Label>
+                          <Form.Select
+                            value={quizReason}
+                            onChange={(event) => setQuizReason(event.target.value as QuizDiscountReason)}
+                            disabled={isQuizConfigLocked}
+                          >
+                            {QUIZ_DISCOUNT_REASONS.map((item) => (
+                              <option key={item.value} value={item.value}>
+                                {item.label}
+                              </option>
+                            ))}
+                          </Form.Select>
+                        </Col>
+                        <Col md={3}>
+                          <Form.Label>Fecha inicio</Form.Label>
+                          <Form.Control
+                            type="date"
+                            value={quizStartDate}
+                            onChange={(event) => setQuizStartDate(event.target.value)}
+                            disabled={isQuizConfigLocked}
+                          />
+                        </Col>
+                        <Col md={3}>
+                          <Form.Label>Fecha fin</Form.Label>
+                          <Form.Control
+                            type="date"
+                            value={quizEndDate}
+                            onChange={(event) => setQuizEndDate(event.target.value)}
+                            disabled={isQuizConfigLocked}
+                          />
+                        </Col>
+                      </Row>
+
+                      <Row className="mb-3">
+                        <Col md={6} className="mb-3 mb-md-0">
+                          <Form.Label>% de descuento</Form.Label>
+                          <Form.Control
+                            type="number"
+                            min={1}
+                            max={90}
+                            value={quizDiscountPercent}
+                            onChange={(event) => {
+                              const raw = Math.round(Number(event.target.value) || 1);
+                              setQuizDiscountPercent(Math.min(90, Math.max(1, raw)));
+                            }}
+                            disabled={isQuizConfigLocked}
+                          />
+                          <Form.Text className="text-muted">
+                            Se aplica al total restante después de cupones.
+                          </Form.Text>
+                        </Col>
+                        <Col md={6}>
+                          <Form.Label>Cargo por error ($)</Form.Label>
+                          <Form.Control
+                            type="number"
+                            min={0}
+                            step={0.5}
+                            value={quizPenaltyFee}
+                            onChange={(event) => {
+                              const raw = Math.max(0, Number(event.target.value) || 0);
+                              setQuizPenaltyFee(Math.round(raw * 100) / 100);
+                            }}
+                            disabled={isQuizConfigLocked}
+                          />
+                          <Form.Text className="text-muted">
+                            Importe fijo que se suma si la respuesta es incorrecta.
+                          </Form.Text>
+                        </Col>
+                      </Row>
+
+                      <Button
+                        variant="primary"
+                        disabled={savingQuiz}
+                        onClick={handleQuizSave}
+                      >
+                        {savingQuiz ? 'Guardando...' : 'Guardar configuración'}
+                      </Button>
+                    </Card.Body>
+                  </Card>
+                </Col>
+
+                <Col lg={6} className="mb-3">
+                  <Card className="shadow-sm benefits-card h-100">
+                    <Card.Header className="benefits-card__header d-flex justify-content-between align-items-center">
+                      <span>Vista previa del quiz</span>
+                      <Badge bg="info" text="dark">{quizDiscountPercent}% OFF</Badge>
+                    </Card.Header>
+                    <Card.Body className="benefits-card__body">
+                      <p className="mb-2">
+                        <strong>Temática:</strong> {selectedQuizSet.label}
+                      </p>
+                      <p className="small text-muted mb-3">{selectedQuizSet.description}</p>
+                      <div className="mb-3">
+                        <Badge bg="secondary" className="me-2">Descuento</Badge>
+                        <span className="small text-muted">{quizDiscountPercent}% sobre el total neto</span>
+                      </div>
+                      <div className="mb-3">
+                        <Badge bg={quizPenaltyFee > 0 ? 'danger' : 'success'} className="me-2">
+                          {quizPenaltyFee > 0 ? `+ $${quizPenaltyFee.toFixed(2)}` : 'Sin cargo'}
+                        </Badge>
+                        <span className="small text-muted">Cargo aplicado si el quiz falla</span>
+                      </div>
+                      <div className="quiz-questions-preview">
+                        <p className="fw-semibold mb-2">Preguntas disponibles</p>
+                        <ol className="ps-3 mb-0 small">
+                          {selectedQuizSet.questions.map((item, index) => (
+                            <li key={`${selectedQuizSet.key}-${index}`} className="mb-1">
+                              {item.question}
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+              </Row>
             )}
 
             {activeTab === 'coupons' && (
               <Row className="mb-4">
                 <Col lg={5} className="mb-3">
-                  <Card className="shadow-sm h-100">
-                    <Card.Header>
+                  <Card className="shadow-sm benefits-card h-100">
+                    <Card.Header className="benefits-card__header">
                       <strong>Configuración de cupones automáticos</strong>
                     </Card.Header>
-                    <Card.Body>
+                    <Card.Body className="benefits-card__body">
                       {loadingAutoConfig ? (
                         <div className="text-center py-3">
                           <Spinner animation="border" size="sm" />
@@ -524,8 +801,8 @@ const BeneficiosPage: React.FC = () => {
                 </Col>
 
                 <Col lg={7} className="mb-3">
-                  <Card className="shadow-sm h-100">
-                    <Card.Header className="d-flex justify-content-between align-items-center">
+                  <Card className="shadow-sm benefits-card h-100">
+                    <Card.Header className="benefits-card__header d-flex justify-content-between align-items-center">
                       <span>Clientes con pedidos</span>
                       <div className="d-flex align-items-center gap-2">
                         <Form.Label className="mb-0 small">% cupón manual:</Form.Label>
@@ -543,7 +820,7 @@ const BeneficiosPage: React.FC = () => {
                         />
                       </div>
                     </Card.Header>
-                    <Card.Body className="p-0">
+                    <Card.Body className="benefits-card__body p-0">
                       {loadingCustomers ? (
                         <div className="text-center py-3">
                           <Spinner animation="border" size="sm" />
@@ -555,7 +832,7 @@ const BeneficiosPage: React.FC = () => {
                         </div>
                       ) : (
                         <div className="table-responsive">
-                          <Table hover size="sm" className="mb-0">
+                          <Table hover size="sm" className="mb-0 benefits-table">
                             <thead>
                               <tr>
                                 <th>Cliente</th>
@@ -571,12 +848,12 @@ const BeneficiosPage: React.FC = () => {
                                   <td>{c.userName || c.userId}</td>
                                   <td>{c.userEmail || '-'}</td>
                                   <td className="text-center">
-                                    <Badge bg="danger">{c.totalOrders}</Badge>
+                                    <Badge bg="danger" className="benefits-count-badge">{c.totalOrders}</Badge>
                                   </td>
                                   <td className="text-end">{formatCurrency(c.totalAmount)}</td>
                                   <td className="text-center">
                                     <Button
-                                      variant="outline-primary"
+                                      variant="outline-light"
                                       size="sm"
                                       onClick={async () => {
                                         try {
@@ -617,76 +894,78 @@ const BeneficiosPage: React.FC = () => {
               </Row>
             )}
 
-            <Row>
-              <Col>
-                <Card className="shadow-sm">
-                  <Card.Header className="d-flex justify-content-between align-items-center">
-                    <span>Productos disponibles</span>
-                    <Form.Control
-                      type="text"
-                      placeholder="Buscar por nombre, ID o categoría"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      disabled={isConfigLocked}
-                      style={{ maxWidth: '280px' }}
-                      size="sm"
-                    />
-                  </Card.Header>
-                  <Card.Body className="p-0">
-                    {loading ? (
-                      <div className="text-center py-4">
-                        <Spinner animation="border" role="status" size="sm" />
-                        <p className="mt-2 mb-0 text-muted">Cargando productos...</p>
-                      </div>
-                    ) : filteredProducts.length === 0 ? (
-                      <div className="text-center py-4">
-                        <p className="mb-0 text-muted">No se encontraron productos.</p>
-                      </div>
-                    ) : (
-                      <div className="table-responsive" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
-                        <Table hover size="sm" className="mb-0">
-                          <thead>
-                            <tr>
-                              <th>ID</th>
-                              <th>Producto</th>
-                              <th className="text-end">Precio</th>
-                              <th className="text-center">Descuento %</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {filteredProducts.map((product) => {
-                              const discount = productDiscounts[product.productId] || '';
-                              return (
-                                <tr key={product.productId}>
-                                  <td>{product.productId}</td>
-                                  <td>
-                                    <div className="fw-semibold">{product.name}</div>
-                                    <div className="small text-muted">{product.category || 'Sin categoría'}</div>
-                                  </td>
-                                  <td className="text-end">{formatCurrency(product.price)}</td>
-                                  <td className="text-center" style={{ maxWidth: '120px' }}>
-                                    <Form.Control
-                                      type="number"
-                                      min={0}
-                                      max={90}
-                                      step={1}
-                                      size="sm"
-                                      value={discount}
-                                      onChange={(e) => handleDiscountChange(product.productId, e.target.value)}
-                                      disabled={isConfigLocked}
-                                    />
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </Table>
-                      </div>
-                    )}
-                  </Card.Body>
-                </Card>
-              </Col>
-            </Row>
+            {activeTab === 'seasonal' && (
+              <Row>
+                <Col>
+                  <Card className="shadow-sm benefits-card">
+                    <Card.Header className="benefits-card__header d-flex justify-content-between align-items-center">
+                      <span>Productos disponibles</span>
+                      <Form.Control
+                        type="text"
+                        placeholder="Buscar por nombre, ID o categoría"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        disabled={isConfigLocked}
+                        style={{ maxWidth: '280px' }}
+                        size="sm"
+                      />
+                    </Card.Header>
+                    <Card.Body className="benefits-card__body p-0">
+                      {loading ? (
+                        <div className="text-center py-4">
+                          <Spinner animation="border" role="status" size="sm" />
+                          <p className="mt-2 mb-0 text-muted">Cargando productos...</p>
+                        </div>
+                      ) : filteredProducts.length === 0 ? (
+                        <div className="text-center py-4">
+                          <p className="mb-0 text-muted">No se encontraron productos.</p>
+                        </div>
+                      ) : (
+                        <div className="table-responsive" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+                          <Table hover size="sm" className="mb-0 benefits-table">
+                            <thead>
+                              <tr>
+                                <th>ID</th>
+                                <th>Producto</th>
+                                <th className="text-end">Precio</th>
+                                <th className="text-center">Descuento %</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {filteredProducts.map((product) => {
+                                const discount = productDiscounts[product.productId] || '';
+                                return (
+                                  <tr key={product.productId}>
+                                    <td>{product.productId}</td>
+                                    <td>
+                                      <div className="fw-semibold">{product.name}</div>
+                                      <div className="small text-muted">{product.category || 'Sin categoría'}</div>
+                                    </td>
+                                    <td className="text-end">{formatCurrency(product.price)}</td>
+                                    <td className="text-center" style={{ maxWidth: '120px' }}>
+                                      <Form.Control
+                                        type="number"
+                                        min={0}
+                                        max={90}
+                                        step={1}
+                                        size="sm"
+                                        value={discount}
+                                        onChange={(e) => handleDiscountChange(product.productId, e.target.value)}
+                                        disabled={isConfigLocked}
+                                      />
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </Table>
+                        </div>
+                      )}
+                    </Card.Body>
+                  </Card>
+                </Col>
+              </Row>
+            )}
           </Container>
         </main>
 

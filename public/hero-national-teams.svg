@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1200" height="700" viewBox="0 0 1200 700" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="nat-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#03181B"/>
+      <stop offset="70%" stop-color="#1E3B4A"/>
+      <stop offset="100%" stop-color="#F2A65A"/>
+    </linearGradient>
+    <linearGradient id="nat-body" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#154B5D"/>
+      <stop offset="100%" stop-color="#1EA896"/>
+    </linearGradient>
+    <linearGradient id="nat-sleeve" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#113544"/>
+      <stop offset="100%" stop-color="#1E5B7A"/>
+    </linearGradient>
+    <linearGradient id="nat-collar" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#F7D060"/>
+      <stop offset="100%" stop-color="#F2A65A"/>
+    </linearGradient>
+    <linearGradient id="nat-sash" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#F7D060" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#F25C54" stop-opacity="0.85"/>
+    </linearGradient>
+    <pattern id="nat-grid" width="68" height="68" patternUnits="userSpaceOnUse" patternTransform="rotate(-20)">
+      <path d="M0 0L68 0 68 68" stroke="rgba(242,166,90,0.22)" stroke-width="2" fill="none"/>
+    </pattern>
+    <filter id="nat-shadow" x="360" y="30" width="700" height="620" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feGaussianBlur in="BackgroundImageFix" stdDeviation="18"/>
+      <feComposite in2="SourceAlpha" operator="in" result="effect1_backgroundBlur"/>
+      <feBlend in="SourceGraphic" in2="effect1_backgroundBlur" mode="normal" result="shape"/>
+      <feDropShadow dx="0" dy="22" stdDeviation="36" flood-color="rgba(0,0,0,0.25)"/>
+    </filter>
+  </defs>
+  <rect width="1200" height="700" rx="38" fill="url(#nat-bg)"/>
+  <rect width="1200" height="700" rx="38" fill="url(#nat-grid)" opacity="0.18"/>
+  <g filter="url(#nat-shadow)">
+    <path d="M700 110L748 60L852 60L900 110H990L954 206C950 216 948 228 948 240V540C948 554 936 566 920 566H636C620 566 608 554 608 540V240C608 228 606 216 602 206L566 110H656L700 110Z" fill="url(#nat-body)"/>
+    <path d="M656 110L708 66L752 38C768 28 796 28 812 38L856 66L904 110H900L852 60H748L700 110H656Z" fill="url(#nat-sleeve)"/>
+    <path d="M566 110L602 206C606 216 608 228 608 240V540C608 554 620 566 636 566H532C516 566 504 554 504 540V226C504 214 498 204 488 196L430 150L470 110H566Z" fill="url(#nat-sleeve)"/>
+    <path d="M948 240C948 228 950 216 954 206L990 110H1082L1044 178C1034 196 1028 216 1028 236V540C1028 554 1016 566 1000 566H920C936 566 948 554 948 540V240Z" fill="url(#nat-sleeve)"/>
+    <path d="M736 110H812C828 110 840 98 840 82V66H708V82C708 98 720 110 736 110Z" fill="url(#nat-collar)"/>
+    <path d="M620 500L906 190V274L620 584V500Z" fill="url(#nat-sash)" opacity="0.75"/>
+    <path d="M862 285C882 285 898 301 898 321C898 341 882 357 862 357C842 357 826 341 826 321C826 301 842 285 862 285Z" fill="rgba(255,255,255,0.08)"/>
+    <path d="M736 176L876 176C884 176 890 182 890 190V208H722V190C722 182 728 176 736 176Z" fill="rgba(255,255,255,0.1)"/>
+  </g>
+  <g opacity="0.28">
+    <path d="M180 210C260 150 360 150 440 210" stroke="rgba(242,166,90,0.28)" stroke-width="2" fill="none"/>
+    <path d="M210 274C280 222 360 222 430 274" stroke="rgba(30,168,150,0.24)" stroke-width="2" fill="none"/>
+    <path d="M240 338C300 296 364 296 424 338" stroke="rgba(242,166,90,0.22)" stroke-width="2" fill="none"/>
+    <circle cx="330" cy="430" r="120" stroke="rgba(247,208,96,0.25)" stroke-width="2" fill="none"/>
+  </g>
+</svg>

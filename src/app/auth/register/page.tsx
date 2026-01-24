@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '../../context/AuthContext';
-import { Container, Row, Col, Form, Button, Card, Alert } from 'react-bootstrap';
+import { Form, Button, Card, Alert } from 'react-bootstrap';
 
 const Register = () => {
   const [name, setName] = useState('');
@@ -63,9 +63,13 @@ const Register = () => {
   };
 
   return (
-    <main className="d-flex align-items-center justify-content-center min-vh-100 bg-light">
-      <Card className="p-4 shadow border-0 w-100" style={{ maxWidth: 400 }}>
-        <h2 className="fw-bold mb-4 text-center">Crear Cuenta</h2>
+    <main className="auth-page">
+      <Card className="auth-card shadow-lg border-0">
+        <div className="auth-card-header text-center mb-4">
+          <span className="auth-tagline">SpideySports Matchday</span>
+          <h2 className="auth-title">Crear cuenta</h2>
+          <p className="auth-subtitle">Regístrate y completa tu colección de camisetas legendarias.</p>
+        </div>
         <Form onSubmit={handleSubmit}>
           <Form.Group className="mb-3">
             <Form.Label>Nombre</Form.Label>
@@ -83,15 +87,18 @@ const Register = () => {
             <Form.Label>Confirmar Contraseña</Form.Label>
             <Form.Control type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required className="rounded-1" />
           </Form.Group>
-          {error && <Alert variant="danger">{error}</Alert>}
-          <Button type="submit" variant="dark" className="w-100 rounded-1 mb-3" disabled={loading}>
-            {loading ? 'Cargando...' : 'Crear Cuenta'}
+          {error && <Alert variant="danger" className="auth-alert">{error}</Alert>}
+          <Button type="submit" variant="primary" className="w-100 rounded-1 mb-3" disabled={loading}>
+            {loading ? 'Cargando...' : 'Crear cuenta'}
           </Button>
-          <Button type="button" variant="outline-dark" className="w-100 rounded-1 mb-3" onClick={handleGoogleLogin} disabled={loading}>
+          <div className="auth-divider">
+            <span>o continúa con</span>
+          </div>
+          <Button type="button" variant="outline-light" className="w-100 rounded-1" onClick={handleGoogleLogin} disabled={loading}>
             <i className="bi bi-google me-2"></i> Registrarse con Google
           </Button>
-          <div className="text-center">
-            <Link href="/auth/login" className="text-dark">¿Ya tienes cuenta? Inicia sesión</Link>
+          <div className="text-center mt-3">
+            <Link href="/auth/login" className="auth-link">¿Ya tienes cuenta? Inicia sesión</Link>
           </div>
         </Form>
       </Card>

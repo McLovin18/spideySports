@@ -1,6 +1,8 @@
 // src/app/services/recommendationService.ts
 
 import allProducts from '../products/productsData';
+import type { JerseyVersion } from './inventoryService';
+import type { JerseySizeCode } from '../constants/jersey';
 
 export interface Product {
   id: number;
@@ -13,6 +15,13 @@ export interface Product {
   inStock: boolean;
   details: string[];
   featured?: boolean;
+  versions?: JerseyVersion[];
+  defaultVersionId?: string | null;
+  sizeOptions?: Array<{
+    code: JerseySizeCode;
+    label: string;
+    quantity: number;
+  }>;
 }
 
 export interface RecommendationScore {

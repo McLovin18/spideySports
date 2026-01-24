@@ -4,15 +4,15 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { 
-  InputValidator, 
-  DataSanitizer 
+import { Alert } from 'react-bootstrap';
+import {
+  InputValidator,
+  DataSanitizer
 } from '../utils/security';
 import { useSecureForm, useRateLimit } from '../utils/securityMiddleware';
 
 const SecureLogin: React.FC = () => {
   const { login, loginWithGoogle } = useAuth();
-    const { user} = useAuth();
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -120,138 +120,126 @@ const SecureLogin: React.FC = () => {
   };
 
   return (
-    <div className="container mt-5">
-      <div className="row justify-content-center">
-        <div className="col-md-6 col-lg-4">
-          <div className="card shadow">
-            <div className="card-body">
-              <div className="text-center mb-4">
-                <i className="bi bi-person-circle text-primary fs-1"></i>
-                <h3 className="mt-2">Iniciar Sesión</h3>
-                <p className="text-muted">Bienvenido de vuelta</p>
-              </div>
+    <main className="auth-page">
+      <div className="auth-card shadow-lg border-0">
+        <div className="text-center mb-4 auth-card-header">
+          <span className="auth-tagline">SpideySports Matchday</span>
+          <h2 className="auth-title">Iniciar sesión</h2>
+          <p className="auth-subtitle">Vuelve a tu vestidor digital y sigue personalizando tu colección.</p>
+        </div>
 
-              {securityAlert && (
-                <div className="alert alert-warning d-flex align-items-center" role="alert">
-                  <i className="bi bi-exclamation-triangle-fill me-2"></i>
-                  <div>{securityAlert}</div>
-                </div>
-              )}
+        {securityAlert && (
+          <Alert variant="warning" className="auth-alert d-flex align-items-center">
+            <i className="bi bi-shield-exclamation me-2"></i>
+            <span>{securityAlert}</span>
+          </Alert>
+        )}
 
-              {attemptsLeft < 3 && !blocked && (
-                <div className="alert alert-info" role="alert">
-                  <small>
-                    <i className="bi bi-info-circle me-1"></i>
-                    Intentos restantes: {attemptsLeft}
-                  </small>
-                </div>
-              )}
+        {attemptsLeft < 3 && !blocked && (
+          <Alert variant="info" className="auth-alert subtle">
+            <i className="bi bi-info-circle me-2"></i>
+            Intentos restantes: {attemptsLeft}
+          </Alert>
+        )}
 
-              <form onSubmit={handleLogin}>
-                <div className="mb-3">
-                  <label htmlFor="email" className="form-label">
-                    Email <span className="text-danger">*</span>
-                  </label>
-                  <div className="input-group">
-                    <span className="input-group-text"><i className="bi bi-envelope"></i></span>
-                    <input
-                      type="email"
-                      className={`form-control ${errors.email ? 'is-invalid' : ''}`}
-                      id="email"
-                      value={formData.email}
-                      onChange={(e) => handleInputChange('email', e.target.value)}
-                      placeholder="tu@email.com"
-                      maxLength={100}
-                      autoComplete="email"
-                      disabled={blocked}
-                    />
-                    {errors.email && <div className="invalid-feedback">{errors.email}</div>}
-                  </div>
-                </div>
-
-                <div className="mb-3">
-                  <label htmlFor="password" className="form-label">
-                    Contraseña <span className="text-danger">*</span>
-                  </label>
-                  <div className="input-group">
-                    <span className="input-group-text"><i className="bi bi-lock"></i></span>
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      className={`form-control ${errors.password ? 'is-invalid' : ''}`}
-                      id="password"
-                      value={formData.password}
-                      onChange={(e) => handleInputChange('password', e.target.value)}
-                      placeholder="••••••••"
-                      maxLength={128}
-                      autoComplete="current-password"
-                      disabled={blocked}
-                    />
-                    <button
-                      type="button"
-                      className="btn btn-outline-secondary btn-cosmetic-primary"
-                      onClick={() => setShowPassword(!showPassword)}
-                      disabled={blocked}
-                    >
-                      <i className={`bi bi-eye${showPassword ? '-slash' : ''}`}></i>
-                    </button>
-                    {errors.password && <div className="invalid-feedback">{errors.password}</div>}
-                  </div>
-                </div>
-
-                <button
-                onClick={handleLogin}
-                  type="submit"
-                  className="btn btn-primary w-100 mb-3"
-                  disabled={isSubmitting || blocked || Object.keys(errors).length > 0}
-                >
-                  {isSubmitting ? (
-                    <>
-                      <span className="spinner-border spinner-border-sm me-2" role="status"></span>
-                      Verificando...
-                    </>
-                  ) : (
-                    <>
-                      <i className="bi bi-box-arrow-in-right me-2"></i>
-                      Iniciar Sesión
-                    </>
-                  )}
-                </button>
-
-                <div className="text-center mb-3">
-                  <small className="text-muted">o continúa con</small>
-                </div>
-
-                <button
-                  type="button"
-                  className="btn btn-outline-danger w-100 btn-profile"
-                  onClick={handleGoogleLogin}
-                  disabled={blocked}
-                >
-                  <i className="bi bi-google me-2"></i>
-                  Google
-                </button>
-              </form>
-
-              <div className="mt-4 text-center">
-                <small className="text-muted d-flex align-items-center justify-content-center">
-                  <i className="bi bi-shield-check text-success me-1"></i>
-                  Conexión segura SSL
-                </small>
-              </div>
-
-              <div className="text-center mt-3">
-                <small>
-                  ¿No tienes cuenta?{' '}
-                  <Link href="/auth/register" className="text-primary text-decoration-none fw-bold">
-                    Regístrate aquí
-                  </Link>
-                </small>
-              </div>
+        <form onSubmit={handleLogin}>
+          <div className="mb-3">
+            <label htmlFor="email" className="form-label">
+              Email <span className="text-danger">*</span>
+            </label>
+            <div className="input-group">
+              <span className="input-group-text"><i className="bi bi-envelope"></i></span>
+              <input
+                type="email"
+                className={`form-control ${errors.email ? 'is-invalid' : ''}`}
+                id="email"
+                value={formData.email}
+                onChange={(e) => handleInputChange('email', e.target.value)}
+                placeholder="tu@email.com"
+                maxLength={100}
+                autoComplete="email"
+                disabled={blocked}
+              />
+              {errors.email && <div className="invalid-feedback">{errors.email}</div>}
             </div>
+          </div>
+
+          <div className="mb-3">
+            <label htmlFor="password" className="form-label">
+              Contraseña <span className="text-danger">*</span>
+            </label>
+            <div className="input-group">
+              <span className="input-group-text"><i className="bi bi-lock"></i></span>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                className={`form-control ${errors.password ? 'is-invalid' : ''}`}
+                id="password"
+                value={formData.password}
+                onChange={(e) => handleInputChange('password', e.target.value)}
+                placeholder="••••••••"
+                maxLength={128}
+                autoComplete="current-password"
+                disabled={blocked}
+              />
+              <button
+                type="button"
+                className="btn btn-outline-light"
+                onClick={() => setShowPassword(!showPassword)}
+                disabled={blocked}
+              >
+                <i className={`bi bi-eye${showPassword ? '-slash' : ''}`}></i>
+              </button>
+              {errors.password && <div className="invalid-feedback">{errors.password}</div>}
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            className="btn btn-primary w-100 mb-3"
+            disabled={isSubmitting || blocked || Object.keys(errors).length > 0}
+          >
+            {isSubmitting ? (
+              <>
+                <span className="spinner-border spinner-border-sm me-2" role="status"></span>
+                Verificando...
+              </>
+            ) : (
+              <>
+                <i className="bi bi-box-arrow-in-right me-2"></i>
+                Iniciar sesión
+              </>
+            )}
+          </button>
+
+          <div className="auth-divider">
+            <span>o continúa con</span>
+          </div>
+
+          <button
+            type="button"
+            className="btn btn-outline-light w-100"
+            onClick={handleGoogleLogin}
+            disabled={blocked}
+          >
+            <i className="bi bi-google me-2"></i>
+            Google
+          </button>
+        </form>
+
+        <div className="auth-footer mt-4">
+          <div className="auth-footer-item">
+            <i className="bi bi-shield-check me-2"></i>
+            Conexión segura SSL
+          </div>
+          <div className="auth-footer-item">
+            ¿No tienes cuenta?{' '}
+            <Link href="/auth/register" className="auth-link">
+              Regístrate
+            </Link>
           </div>
         </div>
       </div>
-    </div>
+    </main>
   );
 };
 

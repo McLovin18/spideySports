@@ -1,24 +1,33 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Button, Form, Alert } from 'react-bootstrap';
-import { useAuth } from '../context/AuthContext';
-import TopbarMobile from '../components/TopbarMobile';
-import Sidebar from '../components/Sidebar';
+import React, { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
-import PayPalButton from '../components/paypalButton';
-import WhatsAppButton from '../components/WhatsAppButton';
+import { Alert, Button, Card, Col, Container, Form, Row } from 'react-bootstrap';
+import ConfettiCelebration from '../components/ConfettiCelebration';
 import DeliveryLocationSelector from '../components/DeliveryLocationSelector';
+import Footer from '../components/Footer';
+import PayPalButton from '../components/paypalButton';
 import PayPalProvider from '../components/paypalProvider';
-import Footer from "../components/Footer";
-
-import { savePurchase, getUserDisplayInfo } from '../services/purchaseService';
-import { createDeliveryOrder } from '../services/deliveryService';
+import Sidebar from '../components/Sidebar';
+import TopbarMobile from '../components/TopbarMobile';
+import WhatsAppButton from '../components/WhatsAppButton';
+import { useAuth } from '../context/AuthContext';
 import { cartService, type CartItem } from '../services/cartService';
-import { guestPurchaseService } from "../services/guestPurchaseService";
-import { inventoryService } from '../services/inventoryService';
 import { couponService, type Coupon } from '../services/couponService';
+import { createDeliveryOrder } from '../services/deliveryService';
+import { guestPurchaseService } from '../services/guestPurchaseService';
+import { inventoryService } from '../services/inventoryService';
 import { getSeasonalDiscountConfig, type SeasonalDiscountConfig, getProductSeasonalDiscountPercent } from '../services/seasonalDiscountService';
+import {
+  getQuizDiscountConfig,
+  getQuizQuestionSet,
+  isQuizConfigActiveNow,
+  type QuizDiscountConfig,
+  type QuizQuestion,
+} from '../services/quizDiscountService';
+import { getUserDisplayInfo, savePurchase, type PricingAdjustments } from '../services/purchaseService';
+
+const roundCurrency = (value: number) => Math.round(value * 100) / 100;
 
 const CartPage = () => {
   const { user, loading, anonymousId } = useAuth();
@@ -26,6 +35,11 @@ const CartPage = () => {
   const [isClient, setIsClient] = useState(false);
   const [seasonalConfig, setSeasonalConfig] = useState<SeasonalDiscountConfig | null>(null);
   const [loadingSeasonal, setLoadingSeasonal] = useState(false);
+  const [quizConfig, setQuizConfig] = useState<QuizDiscountConfig | null>(null);
+  const [quizQuestion, setQuizQuestion] = useState<QuizQuestion | null>(null);
+  const [quizAnswer, setQuizAnswer] = useState('');
+  const [quizError, setQuizError] = useState('');
+  const [quizResult, setQuizResult] = useState<'correct' | 'incorrect' | null>(null);
 
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [saveError, setSaveError] = useState('');
@@ -39,11 +53,42 @@ const CartPage = () => {
   const [couponError, setCouponError] = useState('');
   const [validatingCoupon, setValidatingCoupon] = useState(false);
 
-  const calculateTotal = () => cartItems.reduce((total, item) => total + item.price * item.quantity, 0);
+  const subtotal = useMemo(
+    () => cartItems.reduce((total, item) => total + item.price * item.quantity, 0),
+    [cartItems]
+  );
 
-  const subtotal = calculateTotal();
-  const discountAmount = appliedCoupon ? subtotal * (appliedCoupon.discountPercent / 100) : 0;
-  const finalTotal = Math.max(0, subtotal - discountAmount);
+  const couponDiscountAmount = useMemo(() => {
+    if (!appliedCoupon) return 0;
+    return roundCurrency(subtotal * (appliedCoupon.discountPercent / 100));
+  }, [appliedCoupon, subtotal]);
+
+  const baseAfterCoupon = useMemo(() => {
+    const base = subtotal - couponDiscountAmount;
+    return roundCurrency(base > 0 ? base : 0);
+  }, [subtotal, couponDiscountAmount]);
+
+  const quizCampaignActive = useMemo(() => isQuizConfigActiveNow(quizConfig), [quizConfig]);
+
+  const quizQuestionSet = useMemo(
+    () => (quizConfig ? getQuizQuestionSet(quizConfig.reason) : null),
+    [quizConfig]
+  );
+
+  const quizDiscountAmount = useMemo(() => {
+    if (!quizCampaignActive || quizResult !== 'correct' || !quizConfig) return 0;
+    return roundCurrency(baseAfterCoupon * (quizConfig.discountPercent / 100));
+  }, [quizCampaignActive, quizResult, quizConfig, baseAfterCoupon]);
+
+  const quizPenaltyAmount = useMemo(() => {
+    if (!quizCampaignActive || quizResult !== 'incorrect' || !quizConfig) return 0;
+    return roundCurrency(quizConfig.penaltyFee);
+  }, [quizCampaignActive, quizResult, quizConfig]);
+
+  const finalTotal = useMemo(() => {
+    const total = baseAfterCoupon - quizDiscountAmount + quizPenaltyAmount;
+    return roundCurrency(total > 0 ? total : 0);
+  }, [baseAfterCoupon, quizDiscountAmount, quizPenaltyAmount]);
 
   useEffect(() => setIsClient(true), []);
 
@@ -64,15 +109,26 @@ const CartPage = () => {
     loadSeasonal();
   }, []);
 
+  useEffect(() => {
+    const loadQuizConfig = async () => {
+      try {
+        const config = await getQuizDiscountConfig();
+        setQuizConfig(config);
+      } catch (err) {
+        console.error('Error cargando configuración del quiz de descuento en carrito:', err);
+      }
+    };
+
+    loadQuizConfig();
+  }, []);
+
   // Suscripción al carrito
   useEffect(() => {
     if (!isClient || loading) return;
 
     if (!user?.uid) {
-      const handler = () => setCartItems(JSON.parse(localStorage.getItem("cartItems_guest") || "[]"));
-      window.addEventListener("cart-updated", handler);
-      handler();
-      return () => window.removeEventListener("cart-updated", handler);
+      const unsub = cartService.subscribe(setCartItems);
+      return unsub;
     }
 
     cartService.migrateFromLocalStorage(user.uid);
@@ -80,38 +136,75 @@ const CartPage = () => {
     return unsub;
   }, [user?.uid, loading, isClient]);
 
-  // Actualizar cantidad de producto en carrito
-  const updateQuantity = async (id: number, newQuantity: number) => {
-    try {
-      if (newQuantity < 1) return removeItem(id);
+  useEffect(() => {
+    if (!quizCampaignActive || !quizQuestionSet) {
+      setQuizQuestion(null);
+      setQuizAnswer('');
+      setQuizError('');
+      setQuizResult(null);
+      return;
+    }
 
-      if (!user?.uid) {
-        const guestItems = JSON.parse(localStorage.getItem("cartItems_guest") || "[]");
-        const updated = guestItems.map((item: any) => item.id === id ? { ...item, quantity: newQuantity } : item);
-        localStorage.setItem("cartItems_guest", JSON.stringify(updated));
-        window.dispatchEvent(new Event("cart-updated"));
+    if (quizQuestionSet.questions.length === 0) {
+      setQuizQuestion(null);
+      return;
+    }
+
+    const randomIndex = Math.floor(Math.random() * quizQuestionSet.questions.length);
+    setQuizQuestion(quizQuestionSet.questions[randomIndex]);
+    setQuizAnswer('');
+    setQuizError('');
+    setQuizResult(null);
+  }, [quizCampaignActive, quizQuestionSet]);
+
+  // Actualizar cantidad de producto en carrito
+  const updateQuantity = async (cartItem: CartItem, newQuantity: number) => {
+    try {
+      if (newQuantity < 1) {
+        await removeItem(cartItem);
         return;
       }
 
-      await cartService.updateCartItemQuantity(user.uid, id, newQuantity);
+      await cartService.updateCartItemQuantity(
+        user?.uid || '',
+        cartItem.id,
+        newQuantity,
+        cartItem.sizeCode,
+        cartItem.versionId
+      );
     } catch (error) {
       console.error("Error al actualizar cantidad", error);
     }
   };
 
-  const removeItem = async (id: number) => {
+  const removeItem = async (cartItem: CartItem) => {
     try {
-      if (!user?.uid) {
-        const guestItems = JSON.parse(localStorage.getItem("cartItems_guest") || "[]");
-        localStorage.setItem("cartItems_guest", JSON.stringify(guestItems.filter((item: any) => item.id !== id)));
-        window.dispatchEvent(new Event("cart-updated"));
-        return;
-      }
-
-      await cartService.removeFromCart(user.uid, id);
+      await cartService.removeFromCart(
+        user?.uid || '',
+        cartItem.id,
+        cartItem.sizeCode,
+        cartItem.versionId
+      );
     } catch (error) {
       console.error("Error al remover item", error);
     }
+  };
+
+  const handleQuizSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+
+    if (!quizQuestion) return;
+
+    const answer = quizAnswer.trim();
+    if (!answer) {
+      setQuizError('Ingresa tu respuesta para participar.');
+      return;
+    }
+
+    const normalized = answer.toLowerCase();
+    const isCorrect = quizQuestion.answers.some((expected) => normalized === expected.toLowerCase());
+    setQuizResult(isCorrect ? 'correct' : 'incorrect');
+    setQuizError('');
   };
 
   // Aplicar código de descuento
@@ -164,7 +257,6 @@ const CartPage = () => {
     }
   };
 
-
   // Pago exitoso
   const handlePaymentSuccess = async (details: any) => {
     setProcessing(true);
@@ -177,19 +269,29 @@ const CartPage = () => {
         return;
       }
 
-      // Preparar items para validar y reducir stock
-      const itemsToProcess = cartItems.map(item => ({
-        productId: item.id,
-        quantity: item.quantity
-      }));
+      const pricingAdjustmentsMap: PricingAdjustments = {};
+      if (couponDiscountAmount > 0) pricingAdjustmentsMap.coupon = couponDiscountAmount;
+      if (quizDiscountAmount > 0) pricingAdjustmentsMap.quizDiscount = quizDiscountAmount;
+      if (quizPenaltyAmount > 0) pricingAdjustmentsMap.quizPenalty = quizPenaltyAmount;
 
-      try {
-        await inventoryService.processOrder(itemsToProcess);
-      } catch (stockError: any) {
-        setSaveError(stockError.message || 'Algunos productos no tienen stock suficiente.');
-        setProcessing(false);
-        return;
-      }
+      const pricingAdjustmentsKeys = Object.keys(pricingAdjustmentsMap);
+      const pricingAdjustmentsPayload = pricingAdjustmentsKeys.length > 0 ? pricingAdjustmentsMap : undefined;
+
+      const triviaResultSummary = quizCampaignActive && quizQuestion && quizResult
+        ? {
+            question: quizQuestion.question,
+            result: quizResult,
+            ...(quizResult === 'correct'
+              ? {
+                  discountApplied: true,
+                  discountAmount: quizDiscountAmount,
+                }
+              : {
+                  discountApplied: false,
+                  penaltyAmount: quizPenaltyAmount,
+                }),
+          }
+        : undefined;
 
       if (!user?.uid) {
         // Pago invitado
@@ -199,14 +301,48 @@ const CartPage = () => {
           payer: details.payer,
           contact: { name: deliveryLocation?.name || "Invitado", phone: deliveryLocation?.phone || "", email: guestEmail },
           deliveryLocation,
-          items: cartItems.map(item => ({ id: item.id, name: item.name, price: item.price, quantity: item.quantity, image: item.image })),
+          items: cartItems.map(item => ({
+            id: item.id.toString(),
+            name: item.name,
+            price: item.price,
+            quantity: item.quantity,
+            image: item.image,
+            sizeCode: item.sizeCode,
+            sizeLabel: item.sizeLabel,
+            versionId: item.versionId,
+            versionLabel: item.versionLabel,
+            versionColorHex: item.versionColorHex
+          })),
           total: finalTotal,
+          ...(pricingAdjustmentsPayload ? { pricingAdjustments: pricingAdjustmentsPayload } : {}),
+          ...(triviaResultSummary ? { triviaResult: triviaResultSummary } : {}),
           date: new Date().toISOString(),
           status: "paid"
         };
+        const itemsToProcess = cartItems.map(item => ({
+          productId: item.id,
+          quantity: item.quantity,
+          sizeCode: item.sizeCode,
+          versionId: item.versionId
+        }));
 
-        // Guardar compra del invitado
-        await guestPurchaseService.saveGuestPurchase(purchaseData);
+        let guestPurchaseId: string | null = null;
+
+        try {
+          guestPurchaseId = await guestPurchaseService.saveGuestPurchase(purchaseData);
+          await inventoryService.processOrder(itemsToProcess);
+        } catch (stockError: any) {
+          if (guestPurchaseId) {
+            const rollbackSucceeded = await guestPurchaseService.deleteGuestPurchase(guestPurchaseId);
+            if (!rollbackSucceeded) {
+              console.error('No se pudo revertir la compra de invitado tras fallo de stock.');
+            }
+          }
+
+          setSaveError(stockError?.message || 'Algunos productos no tienen stock suficiente.');
+          setProcessing(false);
+          return;
+        }
 
           // --- Enviar correo al invitado ---
           try {
@@ -256,7 +392,18 @@ const CartPage = () => {
       const purchaseData = {
         userId: user.uid,
         date: new Date().toISOString(),
-        items: cartItems.map(item => ({ id: item.id.toString(), name: item.name, price: item.price, quantity: item.quantity, image: item.image })),
+        items: cartItems.map(item => ({
+          id: item.id.toString(),
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity,
+          image: item.image,
+          sizeCode: item.sizeCode,
+          sizeLabel: item.sizeLabel,
+          versionId: item.versionId,
+          versionLabel: item.versionLabel,
+          versionColorHex: item.versionColorHex
+        })),
         total: finalTotal,
         paypalDetails: {
           transactionId: details.id,
@@ -275,7 +422,9 @@ const CartPage = () => {
           zone: deliveryLocation?.zone || 'No especificada',
           address: deliveryLocation?.address || 'Dirección por especificar',
           phone: deliveryLocation?.phone || 'Teléfono no especificado'
-        }
+        },
+        ...(pricingAdjustmentsPayload ? { pricingAdjustments: pricingAdjustmentsPayload } : {}),
+        ...(triviaResultSummary ? { triviaResult: triviaResultSummary } : {})
       };
 
       const purchaseId = await savePurchase(purchaseData, userInfo.userName, userInfo.userEmail);
@@ -318,11 +467,13 @@ const CartPage = () => {
   if (paymentSuccess) {
     const isGuest = !user;
     return (
-      <div className="d-flex flex-column min-vh-100">
+      <div className="d-flex flex-column min-vh-100 position-relative">
+        <ConfettiCelebration />
         <Container className="py-5 flex-grow-1 text-center">
           <i className="bi bi-check-circle-fill text-success" style={{ fontSize: '4rem' }}></i>
-          <h2 className="mt-3">¡Pago realizado con éxito!</h2>
-          <p className="text-muted">Gracias por tu compra. Pronto recibirás un correo con los detalles de tu pedido.</p>
+          <h2 className="mt-3">¡Golazo! Pedido confirmado</h2>
+          <p className="text-muted">Tu camiseta ya está lista para saltar a la cancha. En breve recibirás un correo con los detalles de envío.</p>
+          <p className="fw-semibold text-cosmetic-tertiary">Gracias por unirte a la hinchada de SpideySports, ¡nos vemos en la grada!</p>
 
           {saveError && <Alert variant="warning" className="mt-3">{saveError}</Alert>}
 
@@ -376,13 +527,21 @@ const CartPage = () => {
                           <Col xs={8} md={9} className="p-3">
                             <div className="d-flex justify-content-between align-items-center mb-2">
                               <h5 className="fw-bold mb-0 text-cosmetic-tertiary">{item.name}</h5>
-                              <Button variant="link" className="btn-cosmetic-primary text-danger p-0" onClick={() => removeItem(item.id)}><i className="bi bi-x-lg"></i></Button>
+                              <Button variant="link" className="btn-cosmetic-primary text-danger p-0" onClick={() => removeItem(item)}><i className="bi bi-x-lg"></i></Button>
+                            </div>
+                            <div className="text-muted mb-2">
+                              {item.versionLabel && (
+                                <div className="small">Versión: {item.versionLabel}</div>
+                              )}
+                              {item.sizeLabel && (
+                                <div className="small">Talla: {item.sizeLabel}</div>
+                              )}
                             </div>
                             <div className="d-flex align-items-center mb-2">
                               <span className="me-2 ">Cantidad:</span>
-                              <Button size="sm" className="btn-cosmetic-primary px-2 py-0" onClick={() => updateQuantity(item.id, item.quantity - 1)}>-</Button>
+                              <Button size="sm" className="btn-cosmetic-primary px-2 py-0" onClick={() => updateQuantity(item, item.quantity - 1)}>-</Button>
                               <span className="mx-2">{item.quantity}</span>
-                              <Button size="sm" className="btn-cosmetic-primary px-2 py-0" onClick={() => updateQuantity(item.id, item.quantity + 1)}>+</Button>
+                              <Button size="sm" className="btn-cosmetic-primary px-2 py-0" onClick={() => updateQuantity(item, item.quantity + 1)}>+</Button>
                             </div>
                             <div className="d-flex flex-column align-items-start">
                               {/* Monto actual (el que realmente se cobra) */}
@@ -441,8 +600,17 @@ const CartPage = () => {
                       </div>
                       <div className="d-flex justify-content-between mb-2">
                         <span>Envío</span>
-                        <span className="text-success">Gratis</span>
+                        {quizPenaltyAmount > 0 ? (
+                          <span className="text-danger">+ ${quizPenaltyAmount.toFixed(2)}</span>
+                        ) : (
+                          <span className="text-success">Gratis</span>
+                        )}
                       </div>
+                      {quizPenaltyAmount > 0 && quizResult === 'incorrect' && (
+                        <div className="text-danger small mb-3">
+                          Se aplica un cargo extra por fallar el quiz.
+                        </div>
+                      )}
 
                       {user?.uid && (
                         <Form onSubmit={handleApplyCoupon} className="my-3">
@@ -482,10 +650,66 @@ const CartPage = () => {
                         </Form>
                       )}
 
+                      {quizCampaignActive && quizQuestion && cartItems.length > 0 && (
+                        <div className="rounded-3 bg-light p-3 mb-3">
+                          <h6 className="fw-semibold mb-2">
+                            Quiz por descuento ({quizConfig?.discountPercent ?? 0}% OFF)
+                          </h6>
+                          <p className="small text-muted mb-3">
+                            Responde correctamente la trivia de {quizConfig?.reasonLabel || 'fútbol'} para activar el descuento.{' '}
+                            {quizConfig?.penaltyFee && quizConfig.penaltyFee > 0
+                              ? `Si fallas se suma $${quizConfig.penaltyFee.toFixed(2)} al envío.`
+                              : 'Si fallas solo pierdes la bonificación.'}
+                          </p>
+                          <div className="fw-semibold mb-2" style={{ lineHeight: 1.4 }}>
+                            {quizQuestion.question}
+                          </div>
+                          <Form onSubmit={handleQuizSubmit}>
+                            <Form.Label className="small text-muted">Tu respuesta</Form.Label>
+                            <Form.Control
+                              type="text"
+                              placeholder="Escribe aquí tu respuesta"
+                              value={quizAnswer}
+                              onChange={(event) => {
+                                setQuizAnswer(event.target.value);
+                                if (quizError) setQuizError('');
+                              }}
+                              disabled={quizResult !== null || processing}
+                            />
+                            <Button
+                              type="submit"
+                              className="btn-cosmetic-primary w-100 mt-2"
+                              disabled={quizResult !== null || processing}
+                            >
+                              {quizResult !== null ? 'Quiz completado' : 'Responder y participar'}
+                            </Button>
+                          </Form>
+                          {quizError && (
+                            <div className="text-danger small mt-2">{quizError}</div>
+                          )}
+                          {quizResult === 'correct' && (
+                            <Alert variant="success" className="mt-3 mb-0">
+                              ¡Descuento activado! Aplicamos {quizConfig?.discountPercent ?? 0}% a tu compra.
+                            </Alert>
+                          )}
+                          {quizResult === 'incorrect' && (
+                            <Alert variant="warning" className="mt-3 mb-0">
+                              Buen intento. {quizConfig?.penaltyFee && quizConfig.penaltyFee > 0 ? 'Esta vez se sumó el cargo configurado.' : 'No se aplicó la bonificación en esta compra.'}
+                            </Alert>
+                          )}
+                        </div>
+                      )}
+
                       {appliedCoupon && (
                         <div className="d-flex justify-content-between mb-2 text-success">
                           <span>Descuento ({appliedCoupon.discountPercent}%)</span>
-                          <span>- ${discountAmount.toFixed(2)}</span>
+                          <span>- ${couponDiscountAmount.toFixed(2)}</span>
+                        </div>
+                      )}
+                      {quizDiscountAmount > 0 && (
+                        <div className="d-flex justify-content-between mb-2 text-success">
+                          <span>Quiz aplicado (-{quizConfig?.discountPercent ?? 0}%)</span>
+                          <span>- ${quizDiscountAmount.toFixed(2)}</span>
                         </div>
                       )}
                       <hr />

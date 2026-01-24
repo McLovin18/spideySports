@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1200" height="700" viewBox="0 0 1200 700" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="club-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#03181B"/>
+      <stop offset="70%" stop-color="#064754"/>
+      <stop offset="100%" stop-color="#037B90"/>
+    </linearGradient>
+    <linearGradient id="club-body" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0F5A68"/>
+      <stop offset="100%" stop-color="#05B7D5"/>
+    </linearGradient>
+    <linearGradient id="club-sleeve" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#064754"/>
+      <stop offset="100%" stop-color="#0B92A9"/>
+    </linearGradient>
+    <linearGradient id="club-collar" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#F2A65A"/>
+      <stop offset="100%" stop-color="#FFE6BB"/>
+    </linearGradient>
+    <linearGradient id="club-stripe" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.65)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0.05)"/>
+    </linearGradient>
+    <pattern id="club-grid" width="60" height="60" patternUnits="userSpaceOnUse" patternTransform="rotate(25)">
+      <path d="M0 0L60 0 60 60" stroke="rgba(3,123,144,0.15)" stroke-width="2" fill="none"/>
+    </pattern>
+    <filter id="club-shadow" x="450" y="20" width="640" height="602" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feGaussianBlur in="BackgroundImageFix" stdDeviation="18"/>
+      <feComposite in2="SourceAlpha" operator="in" result="effect1_backgroundBlur"/>
+      <feBlend in="SourceGraphic" in2="effect1_backgroundBlur" mode="normal" result="shape"/>
+      <feDropShadow dx="0" dy="20" stdDeviation="28" flood-color="rgba(0,0,0,0.25)"/>
+    </filter>
+  </defs>
+  <rect width="1200" height="700" rx="38" fill="url(#club-bg)"/>
+  <rect width="1200" height="700" rx="38" fill="url(#club-grid)" opacity="0.22"/>
+  <g filter="url(#club-shadow)">
+    <path d="M650 110L706 66L828 66L884 110H966L934 200L934 536C934 550 922 562 906 562H628C612 562 600 550 600 536L600 200L568 110H650Z" fill="url(#club-body)"/>
+    <path d="M650 110L706 66L748 40C764 30 794 30 810 40L852 66L828 66L772 102C756 112 738 112 722 102L666 66H650Z" fill="url(#club-sleeve)"/>
+    <path d="M568 110L600 200V536C600 550 612 562 628 562H534C518 562 506 550 506 536V224C506 212 500 200 490 192L438 154L468 110H568Z" fill="url(#club-sleeve)"/>
+    <path d="M934 200L966 110H1056L1020 174C1010 192 1004 210 1004 230V536C1004 550 992 562 976 562H906C922 562 934 550 934 536V200Z" fill="url(#club-sleeve)"/>
+    <path d="M728 110H808C824 110 836 98 836 82V66H700V82C700 98 712 110 728 110Z" fill="url(#club-collar)"/>
+    <path d="M744 140H792C798 140 804 146 804 152V512C804 518 798 524 792 524H744C738 524 732 518 732 512V152C732 146 738 140 744 140Z" fill="url(#club-stripe)" opacity="0.42"/>
+    <path d="M690 220H842V248L816 256L690 220Z" fill="rgba(3,24,27,0.28)"/>
+    <path d="M842 220L690 256V292H842V220Z" fill="rgba(255,255,255,0.08)"/>
+  </g>
+  <g opacity="0.3">
+    <path d="M140 180C220 120 320 120 400 180" stroke="rgba(5,183,213,0.25)" stroke-width="2" fill="none"/>
+    <path d="M160 246C230 190 310 190 380 246" stroke="rgba(3,123,144,0.22)" stroke-width="2" fill="none"/>
+    <path d="M180 312C240 268 308 268 368 312" stroke="rgba(5,183,213,0.2)" stroke-width="2" fill="none"/>
+    <circle cx="270" cy="410" r="110" stroke="rgba(3,123,144,0.22)" stroke-width="2" fill="none"/>
+  </g>
+</svg>

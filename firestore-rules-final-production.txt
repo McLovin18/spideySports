@@ -92,6 +92,34 @@ service cloud.firestore {
              data.stock >= 0;
     }
 
+    function isValidCartItem(item) {
+      return item is map &&
+        item.keys().hasAll(['id', 'name', 'price', 'quantity', 'image']) &&
+        item.id is string && item.name is string &&
+        item.price is number && item.price >= 0 &&
+        item.quantity is number && item.quantity > 0 && item.quantity <= 10 &&
+        item.image is string;
+    }
+
+    function isValidGuestPurchase(data) {
+      return data.keys().hasAll(['items', 'total', 'status', 'date']) &&
+        data.items is list && data.items.size() > 0 && data.items.size() <= 40 &&
+        data.items.where(item => isValidCartItem(item)).size() == data.items.size() &&
+        data.total is number && data.total >= 0 &&
+        data.status in ['pending', 'paid', 'confirmed'] &&
+        data.date is string;
+    }
+
+    function isValidCouponData(data) {
+      return data.keys().hasAll(['code', 'userId', 'discountPercent', 'isActive', 'used', 'createdAt', 'source']) &&
+        data.code is string && data.code.size() >= 6 && data.code.size() <= 24 &&
+        data.userId is string && data.userId.size() > 0 &&
+        data.discountPercent is number && data.discountPercent > 0 && data.discountPercent <= 90 &&
+        data.isActive is bool && data.used is bool &&
+        data.createdAt is string &&
+        data.source in ['manual', 'auto'];
+    }
+
     // ✅ USUARIOS: Seguridad robusta pero funcional
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
@@ -221,6 +249,40 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // 🛒 COMPRAS DE INVITADOS (checkout sin autenticación obligatoria)
+    match /guestPurchases/{purchaseId} {
+      allow read: if isAdmin();
+      allow list: if isAdmin();
+
+      allow create: if (
+        (request.auth == null && isValidGuestPurchase(request.resource.data)) ||
+        (isAdmin() && isValidGuestPurchase(request.resource.data))
+      );
+
+      allow update, delete: if false;
+    }
+
+    // 🎟️ CUPONES PERSONALIZADOS PARA CLIENTES FRECUENTES
+    match /coupons/{couponCode} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isAuthenticated();
+
+      allow create: if isAuthenticated() &&
+        request.resource.data.userId == request.auth.uid &&
+        isValidCouponData(request.resource.data);
+
+      allow update: if isAuthenticated() && (
+        isAdmin() || (
+          resource.data.userId == request.auth.uid &&
+          request.resource.data.userId == request.auth.uid &&
+          request.resource.data.discountPercent is number &&
+          request.resource.data.discountPercent > 0 && request.resource.data.discountPercent <= 90
+        )
+      );
+
+      allow delete: if false;
+    }
+
     // ✅ DELIVERY ORDERS: Sistema completo con roles + creación durante compras + admin monitoring
     match /deliveryOrders/{orderId} {
       // 📖 LECTURA: Admin, delivery persons, usuario dueño y sistema automatizado
@@ -329,6 +391,14 @@ service cloud.firestore {
       
       // 📝 ESCRITURA: Solo admin
       allow create, update, delete: if isAdmin();
+    }
+
+    // 🛡️ CONFIGURACIÓN PÚBLICA DE LA TIENDA (descuentos, campañas, etc.)
+    match /publicConfig/{configId} {
+      allow read: if true;
+      allow list: if true;
+      allow create, update: if isAdmin();
+      allow delete: if false;
     }
 
     // 🆕 DELIVERY PERFORMANCE: Métricas y estadísticas

@@ -20,32 +20,30 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://tienda-papers.vercel.app/'),
+  metadataBase: new URL('https://spideysports.vercel.app/'),
   title: {
-    default: "Tiffanys - Tienda de Suministros y variedades",
-    template: "%s | Tiffany's"
+    default: 'SpideySports | Pasión por la camiseta',
+    template: '%s | SpideySports'
   },
-  description: "Descubre los mejores suministros de oficina en Tiffany's, cosmeticos, productos orgánicos y mucho más.",
+  description: 'Encuentra jerseys exclusivos, ediciones limitadas y colecciones especiales de SpideySports para vivir cada partido al máximo.',
   keywords: [
-    "tienda de suministros de oficina",
-    "papelería online",
-    "material de oficina",
-    "accesorios de escritorio",
-    "organización",
-    "escritorio",
-    "papelería",
-    "material de oficina",
-    "accesorios de escritorio",
-    "organización",
-    "cosmeticos",
-    "bisuteria"
+    'spideysports',
+    'jerseys de futbol',
+    'camisetas exclusivas',
+    'merchandising deportivo',
+    'colecciones limitadas',
+    'ropa deportiva premium',
+    'equipaciones oficiales',
+    'servicio delivery futbol',
+    'clubes europeos',
+    'selecciones nacionales'
   ],
-  authors: [{ name: "Nexel" }],
-  creator: "Nexel",
-  publisher: "Nexel",
-  applicationName: "Tiffany's",
-  category: "E-commerce",
-  classification: "Office supplies and many more",
+  authors: [{ name: 'SpideySports Studio' }],
+  creator: 'SpideySports',
+  publisher: 'SpideySports',
+  applicationName: 'SpideySports',
+  category: 'E-commerce',
+  classification: 'Sports apparel and collectibles',
   manifest: '/manifest.json',
   robots: {
     index: true,
@@ -61,46 +59,44 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "es_ES",
-    url: "https://tienda-papers.vercel.app",
-    siteName: "Tiffany's",
-    title: "Tiffanys - Tienda de Suministros y variedades",
-    description: "Descubre los mejores suministros de oficina en Tiffany's. Hechos de la mejor calidad para tu espacio de trabajo.",
+    url: 'https://spideysports.vercel.app',
+    siteName: 'SpideySports',
+    title: 'SpideySports | Jerseys y colecciones exclusivas',
+    description: 'Vive la pasión por el fútbol con ediciones de colección, lanzamientos player issue y drops retro en SpideySports.',
     images: [
       {
-        url: "/logoShop1.png",
+        url: '/logoWeb.png',
         width: 1200,
         height: 630,
-        alt: "Tiffanys - Tienda de Suministros y variedades",
-        type: "image/png",
+        alt: 'SpideySports - Jerseys y colecciones exclusivas',
+        type: 'image/png',
       }
     ],
   },
   twitter: {
     card: "summary_large_image",
-    site: "@tienda-papers",
-    creator: "@tiffanys",
-    title: "Tiffanys - Tienda de Suministros y variedades",
-    description: "Descubre los mejores suministros en Tiffany's. Hechos de la mejor calidad para tu espacio de trabajo, y mucho más.",
-    images: ["/logoShop1.png"],
+    site: '@spideysports',
+    creator: '@spideysports',
+    title: 'SpideySports | Jerseys y colecciones exclusivas',
+    description: 'Drops especiales, player issue, selecciones y collabs únicas disponibles en SpideySports.',
+    images: ['/logoWeb.png'],
   },
   verification: {
-    google: "google-site-verification-code", // Reemplazar con tu código real
-    // yandex: "yandex-verification-code",
-    // yahoo: "yahoo-site-verification-code",
+    google: 'google-site-verification-code',
   },
   alternates: {
-    canonical: "https://tienda-papers.vercel.app/",
+    canonical: 'https://spideysports.vercel.app/',
     languages: {
-      'es-ES': 'https://tienda-papers.vercel.app/',
+      'es-ES': 'https://spideysports.vercel.app/',
     },
   },
   other: {
-    'theme-color': '#000000',
+    'theme-color': '#111827',
     'color-scheme': 'light',
     'mobile-web-app-capable': 'yes',
     'apple-mobile-web-app-capable': 'yes',
     'apple-mobile-web-app-status-bar-style': 'default',
-    'apple-mobile-web-app-title': 'Tyffanys',
+    'apple-mobile-web-app-title': 'SpideySports',
     'format-detection': 'telephone=no',
   },
 };

@@ -41,36 +41,41 @@ const Sidebar = () => {
   return (
     <>
       {/* Sidebar vertical para pantallas grandes - dentro del layout flex */}
-      <aside className="sidebar-desktop d-none d-lg-flex flex-column flex-shrink-0 p-3 shadow-sm" style={{ width: '220px', minHeight: '100vh', backgroundColor: "var(--cosmetic-secondary)", borderRight: '2px solid var(--cosmetic-primary)' }}>
+      <aside className="sidebar-desktop d-none d-lg-flex flex-column flex-shrink-0 p-3 shadow-sm" style={{ width: '220px', minHeight: '100vh', borderRight: '2px solid var(--cosmetic-primary)' }}>
         <ul className="nav nav-pills flex-column mb-auto">
           {menuItems.map((item) => (
             <li key={item.path} className="nav-item mb-2">
-              <Link 
-                href={item.path} 
-                className={`nav-link d-flex align-items-center gap-2 ${pathname === item.path || (item.path.startsWith('/profile') && pathname.startsWith('/profile')) ? '' : ''}`}
-                style={{ 
-                  borderRadius: '0.5rem', 
-                  fontWeight: 500,
-                  backgroundColor: pathname === item.path || (item.path.startsWith('/profile') && pathname.startsWith('/profile')) ? 'var(--cosmetic-primary)' : 'transparent',
-                  color: pathname === item.path || (item.path.startsWith('/profile') && pathname.startsWith('/profile')) ? 'white' : 'var(--cosmetic-tertiary)',
-                  transition: 'all 0.3s ease'
-                }}
-                onMouseEnter={(e) => {
-                  if (!(pathname === item.path || (item.path.startsWith('/profile') && pathname.startsWith('/profile')))) {
-                    e.currentTarget.style.backgroundColor = 'var(--cosmetic-secondary)';
-                    e.currentTarget.style.color = 'var(--cosmetic-primary)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!(pathname === item.path || (item.path.startsWith('/profile') && pathname.startsWith('/profile')))) {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                    e.currentTarget.style.color = 'var(--cosmetic-tertiary)';
-                  }
-                }}
-              >
-                <i className={`bi ${item.icon} fs-5`}></i>
-                {item.name}
-              </Link>
+              {(() => {
+                const isActive = pathname === item.path || (item.path.startsWith('/profile') && pathname.startsWith('/profile'));
+                return (
+                  <Link 
+                    href={item.path} 
+                    className={`nav-link d-flex align-items-center gap-2 ${isActive ? 'active' : ''}`}
+                    style={{ 
+                      borderRadius: '0.5rem', 
+                      fontWeight: 500,
+                      backgroundColor: isActive ? 'var(--cosmetic-primary)' : 'transparent',
+                      color: isActive ? '#ffffff' : 'var(--cosmetic-tertiary)',
+                      transition: 'all 0.3s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isActive) {
+                        e.currentTarget.style.backgroundColor = 'var(--cosmetic-secondary)';
+                        e.currentTarget.style.color = 'var(--cosmetic-primary)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isActive) {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                        e.currentTarget.style.color = 'var(--cosmetic-tertiary)';
+                      }
+                    }}
+                  >
+                    <i className={`bi ${item.icon} fs-5`}></i>
+                    <span>{item.name}</span>
+                  </Link>
+                );
+              })()}
             </li>
           ))}
         </ul>

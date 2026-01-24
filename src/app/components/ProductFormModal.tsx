@@ -1,8 +1,14 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Modal, Form, Button, Row, Col, Badge, Alert, Spinner, Image } from 'react-bootstrap';
-import { inventoryService, type ProductInventory } from '../services/inventoryService';
+import { Modal, Form, Button, Row, Col, Badge, Alert, Spinner, Image, Card, InputGroup } from 'react-bootstrap';
+import {
+  inventoryService,
+  type ProductInventory,
+  type JerseyVersion,
+  type SizeStock
+} from '../services/inventoryService';
 import { useAuth } from '../context/AuthContext';
 import CATEGORIES, { SUBCATEGORIES, getSubcategoryIdRange } from '../constants/categories'; // Categorías y subcategorías con rangos de ID
+import { JERSEY_SIZE_OPTIONS, type JerseySizeCode } from '../constants/jersey';
 
 // Función para cargar el servicio de imágenes de forma segura
 const getImageUploadService = async () => {
@@ -137,21 +143,235 @@ interface ProductFormModalProps {
 
 export default function ProductFormModal({ show, onHide, product, onProductSaved }: ProductFormModalProps) {
   const { user } = useAuth();
+  const defaultCategoryId = CATEGORIES[0]?.id ?? '';
+  const defaultSubcategoryValue = SUBCATEGORIES.find((sub) => sub.id === defaultCategoryId)?.value ?? '';
   
   const [formData, setFormData] = useState({
     productId: 0,
     name: '',
     price: 0,
     stock: 0,
-    category: '',
-    subcategory: '',
+    category: defaultCategoryId,
+    subcategory: defaultSubcategoryValue,
     description: '',
     details: [] as string[]
   });
 
-  const [images, setImages] = useState<string[]>([]);
+  const [versions, setVersions] = useState<JerseyVersion[]>([]);
+  const [defaultVersionId, setDefaultVersionId] = useState<string | null>(null);
+  const [versionUploads, setVersionUploads] = useState<Record<string, File | null>>({});
+  const [versionPreviews, setVersionPreviews] = useState<Record<string, string>>({});
+
+  // Validación de archivos de imagen reutilizada en formularios y versiones
+  const validateImageFile = useMemo(() => (file: File): { isValid: boolean; error?: string } => {
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      return {
+        isValid: false,
+        error: 'Tipo de archivo no permitido. Solo se permiten: JPG, PNG, WebP'
+      };
+    }
+
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSize) {
+      return {
+        isValid: false,
+        error: 'El archivo es demasiado grande. Máximo 5MB permitido'
+      };
+    }
+
+    if (!file.name || file.name.length < 1) {
+      return {
+        isValid: false,
+        error: 'Nombre de archivo inválido'
+      };
+    }
+
+    return { isValid: true };
+  }, []);
+
+  const createEmptySizeStocks = useCallback(
+    (): SizeStock[] => JERSEY_SIZE_OPTIONS.map((size) => ({ code: size.code, quantity: 0 })),
+    []
+  );
+
+  const computeTotalStock = useCallback(
+    () =>
+      versions.reduce((acc, version) => {
+        const versionTotal = version.sizeStocks.reduce(
+          (sum, entry) => sum + Math.max(0, Number(entry.quantity) || 0),
+          0
+        );
+        return acc + versionTotal;
+      }, 0),
+    [versions]
+  );
+
+  const createVersionTemplate = useCallback(
+    (index: number): JerseyVersion => ({
+      id: `version-${Date.now()}-${index}`,
+      label: `Versión ${index + 1}`,
+      imageUrl: '',
+      sizeStocks: createEmptySizeStocks(),
+      availableStock: 0,
+      isActive: false,
+    }),
+    [createEmptySizeStocks]
+  );
+
+  const handleVersionLabelChange = useCallback((versionId: string, value: string) => {
+    setVersions((prev) =>
+      prev.map((version) =>
+        version.id === versionId ? { ...version, label: value } : version
+      )
+    );
+  }, []);
+
+  const handleVersionSizeQuantityChange = useCallback(
+    (versionId: string, code: JerseySizeCode, rawValue: number) => {
+      const sanitized = Number.isFinite(rawValue) ? Math.max(0, Math.floor(rawValue)) : 0;
+      setVersions((prev) =>
+        prev.map((version) => {
+          if (version.id !== versionId) return version;
+
+          const normalizedSizes = JERSEY_SIZE_OPTIONS.map((size) => {
+            const existing = version.sizeStocks.find((entry) => entry.code === size.code) || {
+              code: size.code,
+              quantity: 0,
+            };
+
+            if (size.code === code) {
+              return { ...existing, quantity: sanitized };
+            }
+
+            return existing;
+          });
+
+          const versionTotal = normalizedSizes.reduce((acc, entry) => acc + entry.quantity, 0);
+
+          return {
+            ...version,
+            sizeStocks: normalizedSizes,
+            availableStock: versionTotal,
+            isActive: versionTotal > 0,
+          };
+        })
+      );
+    },
+    []
+  );
+
+  const handleVersionImageSelect = useCallback(
+    (versionId: string, files: FileList | null) => {
+      if (!files || files.length === 0) {
+        return;
+      }
+
+      const file = files[0];
+      const validation = validateImageFile(file);
+      if (!validation.isValid) {
+        setError(validation.error || 'Archivo inválido para la versión.');
+        return;
+      }
+
+      setVersionUploads((prev) => ({
+        ...prev,
+        [versionId]: file,
+      }));
+
+      setVersionPreviews((prev) => {
+        const existing = prev[versionId];
+        if (existing && existing.startsWith('blob:')) {
+          URL.revokeObjectURL(existing);
+        }
+        return {
+          ...prev,
+          [versionId]: URL.createObjectURL(file),
+        };
+      });
+    },
+    [validateImageFile]
+  );
+
+  const handleVersionImageClear = useCallback((versionId: string) => {
+    setVersionUploads((prev) => {
+      const next = { ...prev };
+      delete next[versionId];
+      return next;
+    });
+
+    setVersionPreviews((prev) => {
+      const next = { ...prev };
+      const existing = next[versionId];
+      if (existing && existing.startsWith('blob:')) {
+        URL.revokeObjectURL(existing);
+      }
+      delete next[versionId];
+      return next;
+    });
+
+    setVersions((prev) =>
+      prev.map((version) =>
+        version.id === versionId
+          ? { ...version, imageUrl: '' }
+          : version
+      )
+    );
+  }, []);
+
+  const addNewVersion = useCallback(() => {
+    setVersions((prev) => {
+      const nextVersion = createVersionTemplate(prev.length);
+      if (!defaultVersionId) {
+        setDefaultVersionId(nextVersion.id);
+      }
+      return [...prev, nextVersion];
+    });
+  }, [createVersionTemplate, defaultVersionId]);
+
+  const removeVersion = useCallback(
+    (versionId: string) => {
+      setVersions((prev) => {
+        if (prev.length <= 1) {
+          return prev;
+        }
+
+        const filtered = prev.filter((version) => version.id !== versionId);
+        if (filtered.length === prev.length) {
+          return prev;
+        }
+
+        if (defaultVersionId === versionId) {
+          setDefaultVersionId(filtered[0]?.id ?? null);
+        }
+
+        setVersionUploads((prevUploads) => {
+          const next = { ...prevUploads };
+          delete next[versionId];
+          return next;
+        });
+
+        setVersionPreviews((prevPreviews) => {
+          const next = { ...prevPreviews };
+          const preview = next[versionId];
+          if (preview && preview.startsWith('blob:')) {
+            URL.revokeObjectURL(preview);
+          }
+          delete next[versionId];
+          return next;
+        });
+
+        return filtered;
+      });
+    },
+    [defaultVersionId]
+  );
+
+  const handleSetDefaultVersion = useCallback((versionId: string) => {
+    setDefaultVersionId(versionId);
+  }, []);
+
   const [newDetail, setNewDetail] = useState('');
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -163,41 +383,137 @@ export default function ProductFormModal({ show, onHide, product, onProductSaved
 
   // Effect para actualizar los datos cuando cambia el producto
   useEffect(() => {
+    const timestamp = Date.now();
+
     if (product) {
+      let normalizedVersions: JerseyVersion[] = [];
+
+      if (Array.isArray(product.versions) && product.versions.length > 0) {
+        normalizedVersions = product.versions.map((version, index) => {
+          const normalizedSizeStocks = JERSEY_SIZE_OPTIONS.map((size) => {
+            const existing = version.sizeStocks?.find((entry) => entry.code === size.code);
+            const parsedQuantity = Number(existing?.quantity);
+            return {
+              code: size.code,
+              quantity: Number.isFinite(parsedQuantity) && parsedQuantity > 0
+                ? Math.floor(parsedQuantity)
+                : 0,
+            };
+          });
+
+          const computedTotal = normalizedSizeStocks.reduce((acc, entry) => acc + entry.quantity, 0);
+          const parsedStock = Number((version as JerseyVersion).availableStock);
+          const sanitizedStock = Number.isFinite(parsedStock) && parsedStock >= 0
+            ? Math.floor(parsedStock)
+            : computedTotal;
+
+          return {
+            id: version.id || `version-${timestamp}-${index}`,
+            label: version.label?.trim() || `Versión ${index + 1}`,
+            imageUrl: version.imageUrl || '',
+            sizeStocks: normalizedSizeStocks,
+            availableStock: sanitizedStock,
+            isActive: typeof version.isActive === 'boolean' ? version.isActive : sanitizedStock > 0,
+          } as JerseyVersion;
+        });
+      } else {
+        const fallbackSizeStocks = JERSEY_SIZE_OPTIONS.map((size) => {
+          const existing = product.sizeStocks?.find((entry) => entry.code === size.code);
+          const parsedQuantity = Number(existing?.quantity);
+          return {
+            code: size.code,
+            quantity: Number.isFinite(parsedQuantity) && parsedQuantity > 0
+              ? Math.floor(parsedQuantity)
+              : 0,
+          };
+        });
+
+        const fallbackTotal = fallbackSizeStocks.reduce((acc, entry) => acc + entry.quantity, 0);
+
+        normalizedVersions = [
+          {
+            id: `version-${timestamp}-0`,
+            label: 'Versión 1',
+            imageUrl: product.images?.[0] ?? '',
+            sizeStocks: fallbackSizeStocks,
+            availableStock: fallbackTotal,
+            isActive: fallbackTotal > 0,
+          },
+        ];
+      }
+
+      const aggregatedSizeStocks = JERSEY_SIZE_OPTIONS.map((size) => ({
+        code: size.code,
+        quantity: normalizedVersions.reduce((sum, version) => {
+          const match = version.sizeStocks.find((entry) => entry.code === size.code);
+          return sum + Math.max(0, match?.quantity ?? 0);
+        }, 0),
+      }));
+
+      const aggregatedStock = aggregatedSizeStocks.reduce((acc, entry) => acc + entry.quantity, 0);
+
       setFormData({
         productId: product.productId,
         name: product.name,
         price: product.price,
-        stock: product.stock,
-        category: product.category || '',
-        subcategory: product.subcategory || '',
+        stock: aggregatedStock,
+        category: product.category || defaultCategoryId,
+        subcategory: product.subcategory || defaultSubcategoryValue,
         description: product.description || '',
-        details: product.details || []
+        details: product.details || [],
       });
-      setImages(product.images || []);
       setOriginalProductId(product.productId);
+      setVersions(normalizedVersions);
+      setDefaultVersionId(product.defaultVersionId && normalizedVersions.some((v) => v.id === product.defaultVersionId)
+        ? product.defaultVersionId
+        : normalizedVersions[0]?.id ?? null);
+      setVersionUploads({});
+      setVersionPreviews(
+        normalizedVersions.reduce<Record<string, string>>((acc, version) => {
+          acc[version.id] = version.imageUrl || '';
+          return acc;
+        }, {})
+      );
     } else {
       // Reset para nuevo producto
+      const initialVersion = createVersionTemplate(0);
       setFormData({
         productId: 0,
         name: '',
         price: 0,
         stock: 0,
-        category: '',
-        subcategory: '',
+        category: defaultCategoryId,
+        subcategory: defaultSubcategoryValue,
         description: '',
-        details: []
+        details: [],
       });
-      setImages([]);
       setOriginalProductId(null);
+      setVersions([initialVersion]);
+      setDefaultVersionId(initialVersion.id);
+      setVersionUploads({});
+      setVersionPreviews({});
     }
+
     // Limpiar estados de archivos y errores
-    setSelectedFiles([]);
     setError('');
     setUploadProgress(0);
     setAutoIdInfo('');
     setAutoIdLoading(false);
-  }, [product]);
+  }, [product, createVersionTemplate, defaultCategoryId, defaultSubcategoryValue]);
+
+  useEffect(() => {
+    setFormData((prev) => {
+      const currentTotal = computeTotalStock();
+      if (prev.stock === currentTotal) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        stock: currentTotal,
+      };
+    });
+  }, [computeTotalStock]);
 
   // 🔄 Cuando se elige categoría o subcategoría en modo creación, calcular ID automático
   useEffect(() => {
@@ -239,34 +555,6 @@ export default function ProductFormModal({ show, onHide, product, onProductSaved
     };
   }, [formData.category, formData.subcategory, isEditing]);
 
-  // Función optimizada de validación de archivos
-  const validateImageFile = useMemo(() => (file: File): { isValid: boolean; error?: string } => {
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-    if (!allowedTypes.includes(file.type)) {
-      return {
-        isValid: false,
-        error: 'Tipo de archivo no permitido. Solo se permiten: JPG, PNG, WebP'
-      };
-    }
-
-    const maxSize = 5 * 1024 * 1024; // 5MB
-    if (file.size > maxSize) {
-      return {
-        isValid: false,
-        error: 'El archivo es demasiado grande. Máximo 5MB permitido'
-      };
-    }
-
-    if (!file.name || file.name.length < 1) {
-      return {
-        isValid: false,
-        error: 'Nombre de archivo inválido'
-      };
-    }
-
-    return { isValid: true };
-  }, []);
-
   const handleInputChange = useCallback((field: string, value: any) => {
     setFormData(prev => ({
       ...prev,
@@ -291,59 +579,6 @@ export default function ProductFormModal({ show, onHide, product, onProductSaved
     }));
   }, []);
 
-  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    
-    const validFiles: File[] = [];
-    let totalSize = 0;
-    
-    for (const file of files) {
-      const validation = validateImageFile(file);
-      if (validation.isValid) {
-        validFiles.push(file);
-        totalSize += file.size;
-      } else {
-        setError(validation.error || 'Archivo inválido');
-        return;
-      }
-    }
-    
-    // Validar tamaño total (3MB máximo)
-    const maxTotalSize = 3 * 1024 * 1024; // 3MB
-    if (totalSize > maxTotalSize) {
-      setError(`El tamaño total de las imágenes (${(totalSize / (1024 * 1024)).toFixed(2)}MB) excede el límite de 3MB. Por favor selecciona imágenes más pequeñas o menos cantidad.`);
-      return;
-    }
-    
-    console.log(`📊 Archivos seleccionados: ${validFiles.length} imágenes, ${(totalSize / (1024 * 1024)).toFixed(2)}MB total`);
-    setSelectedFiles(validFiles);
-    setError('');
-  }, [validateImageFile]);
-
-  const removeSelectedFile = useCallback((index: number) => {
-    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
-  }, []);
-
-  const removeExistingImage = useCallback(async (index: number) => {
-    const imageUrl = images[index];
-    setImages(prev => prev.filter((_, i) => i !== index));
-    
-    if (isEditing) {
-      try {
-        const imageService = await getImageUploadService();
-        if (imageService && typeof imageService.deleteImage === 'function') {
-          await imageService.deleteImage(imageUrl);
-          console.log('✅ Imagen eliminada del storage:', imageUrl);
-        } else {
-          console.log('⚠️ Servicio de Firebase no disponible, imagen eliminada solo del estado local');
-        }
-      } catch (error) {
-        console.error('❌ Error eliminando imagen del storage:', error);
-        console.log('✅ Imagen eliminada del estado local exitosamente');
-      }
-    }
-  }, [images, isEditing]);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -362,10 +597,6 @@ export default function ProductFormModal({ show, onHide, product, onProductSaved
         throw new Error('El precio debe ser mayor a 0');
       }
       
-      if (formData.stock < 0) {
-        throw new Error('El stock no puede ser negativo');
-      }
-
       if (!formData.category.trim()) {
         throw new Error('Debes seleccionar una categoría para el producto');
       }
@@ -373,6 +604,120 @@ export default function ProductFormModal({ show, onHide, product, onProductSaved
       if (!formData.subcategory.trim()) {
         throw new Error('Debes seleccionar una subcategoría para asignar correctamente el ID');
       }
+
+      const uploadImagesWithFallback = async (files: File[]): Promise<string[]> => {
+        if (!files.length) {
+          return [];
+        }
+
+        try {
+          console.log(`📤 Intentando subir ${files.length} imagen(es) a Firebase Storage...`);
+          const imageService = await getImageUploadService();
+
+          if (imageService && typeof imageService.uploadMultipleImages === 'function') {
+            console.log('✅ Servicio de Firebase disponible, subiendo archivos reales...');
+            return await imageService.uploadMultipleImages(files, formData.productId);
+          }
+
+          console.warn('⚠️ Servicio de Firebase no disponible, usando servicio de respaldo...');
+          const fallbackService = createFallbackImageService();
+          return await fallbackService.uploadMultipleImages(files, formData.productId);
+        } catch (primaryError) {
+          console.error('❌ Error subiendo imágenes, intentando con servicio de respaldo:', primaryError);
+          const fallbackService = createFallbackImageService();
+          return await fallbackService.uploadMultipleImages(files, formData.productId);
+        }
+      };
+
+      const sanitizedSizes: SizeStock[] = JERSEY_SIZE_OPTIONS.map((size) => ({
+        code: size.code,
+        quantity: versions.reduce((sum, version) => {
+          const match = version.sizeStocks.find((entry) => entry.code === size.code);
+          return sum + Math.max(0, Number(match?.quantity) || 0);
+        }, 0),
+      }));
+
+      const totalStock = sanitizedSizes.reduce((acc, entry) => acc + entry.quantity, 0);
+
+      if (totalStock <= 0) {
+        throw new Error('Debes registrar al menos una camiseta disponible en inventario.');
+      }
+
+      if (!versions.length) {
+        throw new Error('Agrega al menos una versión de la camiseta (por ejemplo local o visitante).');
+      }
+
+      const versionWithoutImage = versions.find((version) => {
+        const existingImage = typeof version.imageUrl === 'string' && version.imageUrl.trim() !== '';
+        const pendingUpload = versionUploads[version.id] instanceof File;
+        return !existingImage && !pendingUpload;
+      });
+
+      if (versionWithoutImage) {
+        throw new Error(`Agrega una imagen para la versión "${versionWithoutImage.label || 'Sin nombre'}" antes de guardar.`);
+      }
+
+      const versionImageUploads: Record<string, string> = {};
+      const versionUploadEntries = Object.entries(versionUploads).filter(([, file]) => file instanceof File);
+
+      if (versionUploadEntries.length > 0) {
+        setUploadProgress((prev) => (prev < 20 ? 20 : prev));
+      }
+
+      for (const [versionId, file] of versionUploadEntries) {
+        if (!file) continue;
+
+        try {
+          const uploadedUrls = await uploadImagesWithFallback([file]);
+          if (uploadedUrls[0]) {
+            versionImageUploads[versionId] = uploadedUrls[0];
+          }
+        } catch (uploadError) {
+          console.error(`❌ Error subiendo imagen para versión ${versionId}:`, uploadError);
+          throw new Error('Error al subir las imágenes específicas de cada versión.');
+        }
+      }
+
+      if (versionUploadEntries.length > 0) {
+        setUploadProgress((prev) => (prev < 80 ? 80 : prev));
+      }
+
+      const normalizedVersions: JerseyVersion[] = versions.map((version, index) => {
+        const sanitizedSizeStocks = JERSEY_SIZE_OPTIONS.map((size) => {
+          const match = version.sizeStocks.find((entry) => entry.code === size.code);
+          const parsedQuantity = Number(match?.quantity);
+          return {
+            code: size.code,
+            quantity: Number.isFinite(parsedQuantity) && parsedQuantity > 0
+              ? Math.floor(parsedQuantity)
+              : 0,
+          };
+        });
+
+        const sanitizedTotal = sanitizedSizeStocks.reduce((sum, entry) => sum + entry.quantity, 0);
+
+        return {
+          id: version.id || `version-${Date.now()}-${index}`,
+          label: version.label.trim() || `Versión ${index + 1}`,
+          imageUrl: (versionImageUploads[version.id] ?? version.imageUrl)?.trim() || '',
+          sizeStocks: sanitizedSizeStocks,
+          availableStock: sanitizedTotal,
+          isActive: sanitizedTotal > 0,
+        };
+      });
+
+      const effectiveDefaultVersion = normalizedVersions.some((v) => v.id === defaultVersionId)
+        ? (defaultVersionId as string)
+        : normalizedVersions[0].id;
+
+      const primaryVersion = normalizedVersions.find((version) => version.id === effectiveDefaultVersion) ?? normalizedVersions[0];
+      const primaryImage = primaryVersion?.imageUrl?.trim() || '/images/product1.svg';
+      const secondaryImages = normalizedVersions
+        .filter((version) => version.id !== primaryVersion?.id)
+        .map((version) => version.imageUrl?.trim())
+        .filter((url): url is string => Boolean(url && url.length > 0));
+
+      const productImages = [primaryImage, ...secondaryImages].filter((url, index, arr) => url && arr.indexOf(url) === index);
 
       // Validar que el ID esté dentro del rango de la subcategoría (si existe rango configurado)
       const range = getSubcategoryIdRange(formData.subcategory);
@@ -382,76 +727,19 @@ export default function ProductFormModal({ show, onHide, product, onProductSaved
         }
       }
 
-      let finalImages = [...images];
-      
-      // Subir las nuevas imágenes seleccionadas
-      if (selectedFiles.length > 0) {
-        setUploadProgress(10);
-        try {
-          console.log('📤 Intentando subir', selectedFiles.length, 'imagen(es) real(es) a Firebase Storage...');
-          
-          // Intentar cargar el servicio real de Firebase
-          const imageService = await getImageUploadService();
-          
-          if (imageService && typeof imageService.uploadMultipleImages === 'function') {
-            console.log('✅ Servicio de Firebase disponible, subiendo archivos reales...');
-            console.log('📋 Detalles de archivos a subir:', selectedFiles.map(f => ({ name: f.name, size: f.size, type: f.type })));
-            
-            const uploadedUrls = await imageService.uploadMultipleImages(
-              selectedFiles, 
-              formData.productId
-            );
-            console.log('🎉 Imágenes subidas exitosamente a Firebase:', uploadedUrls);
-            finalImages = [...finalImages, ...uploadedUrls];
-          } else {
-            console.warn('⚠️ Servicio de Firebase no disponible, usando servicio de respaldo...');
-            console.log('📋 Razón: imageService =', imageService, ', método uploadMultipleImages =', imageService?.uploadMultipleImages);
-            const fallbackService = createFallbackImageService();
-            const fallbackUrls = await fallbackService.uploadMultipleImages(
-              selectedFiles, 
-              formData.productId
-            );
-            console.log('✅ Servicio de respaldo completado:', fallbackUrls);
-            finalImages = [...finalImages, ...fallbackUrls];
-          }
-          
-          setUploadProgress(90);
-        } catch (uploadError: any) {
-          console.error('❌ Error subiendo imágenes:', uploadError);
-          
-          // Si hay error, usar el servicio de respaldo
-          console.log('🔄 Usando servicio de respaldo debido al error...');
-          try {
-            const fallbackService = createFallbackImageService();
-            const fallbackUrls = await fallbackService.uploadMultipleImages(
-              selectedFiles, 
-              formData.productId
-            );
-            console.log('✅ Servicio de respaldo completado tras error:', fallbackUrls);
-            finalImages = [...finalImages, ...fallbackUrls];
-          } catch (fallbackError) {
-            console.error('❌ Error en servicio de respaldo:', fallbackError);
-            throw new Error(`❌ Error subiendo imágenes: ${uploadError.message}`);
-          }
-        }
-      }
-
-      // Si no hay imágenes, usar una imagen placeholder como fallback
-      if (finalImages.length === 0) {
-        console.warn('⚠️ Producto sin imágenes, usando imagen placeholder');
-        finalImages = ['/images/product1.svg'];
-      }
-
       const productData: Omit<ProductInventory, 'lastUpdated' | 'isActive'> = {
         productId: formData.productId,
         name: formData.name.trim(),
         price: formData.price,
-        stock: formData.stock,
-        images: finalImages,
+        stock: totalStock,
+        images: productImages.length > 0 ? productImages : ['/images/product1.svg'],
         category: formData.category.trim(),
         subcategory: formData.subcategory.trim(),
         description: formData.description.trim(),
-        details: formData.details
+        details: formData.details,
+        sizeStocks: sanitizedSizes,
+        versions: normalizedVersions,
+        defaultVersionId: effectiveDefaultVersion,
       };
 
       let success: boolean;
@@ -482,23 +770,32 @@ export default function ProductFormModal({ show, onHide, product, onProductSaved
   };
 
   const handleClose = () => {
+    Object.values(versionPreviews).forEach((preview) => {
+      if (preview && preview.startsWith('blob:')) {
+        URL.revokeObjectURL(preview);
+      }
+    });
+
+    const initialVersion = createVersionTemplate(0);
     setFormData({
       productId: 0,
       name: '',
       price: 0,
       stock: 0,
-      category: '',
-      subcategory: '',
+      category: defaultCategoryId,
+      subcategory: defaultSubcategoryValue,
       description: '',
-      details: []
+      details: [] as string[]
     });
-    setImages([]);
-    setSelectedFiles([]);
     setNewDetail('');
     setError('');
     setUploadProgress(0);
     setAutoIdInfo('');
     setAutoIdLoading(false);
+    setVersions([initialVersion]);
+    setDefaultVersionId(initialVersion.id);
+    setVersionUploads({});
+    setVersionPreviews({});
     onHide();
   };
 
@@ -583,10 +880,13 @@ export default function ProductFormModal({ show, onHide, product, onProductSaved
                 <Form.Label>Stock *</Form.Label>
                 <Form.Control
                   type="number"
-                  value={formData.stock || ''}
-                  onChange={(e) => handleInputChange('stock', parseInt(e.target.value) || 0)}
-                  required
+                  value={computeTotalStock()}
+                  readOnly
+                  disabled
                 />
+                <Form.Text className="text-muted">
+                  El stock total se calcula automáticamente con base en las tallas disponibles.
+                </Form.Text>
               </Form.Group>
             </Col>
             <Col md={4}>
@@ -596,11 +896,12 @@ export default function ProductFormModal({ show, onHide, product, onProductSaved
                   value={formData.category}
                   onChange={(e) => {
                     const value = e.target.value;
+                    const nextSubcategory = SUBCATEGORIES.find((sub) => sub.id === value)?.value ?? '';
                     // al cambiar categoría, limpiar subcategoría e ID
                     setFormData(prev => ({
                       ...prev,
                       category: value,
-                      subcategory: '',
+                      subcategory: nextSubcategory,
                       productId: isEditing ? prev.productId : 0,
                     }));
                     setAutoIdInfo('');
@@ -619,6 +920,140 @@ export default function ProductFormModal({ show, onHide, product, onProductSaved
               </Form.Group>
             </Col>
           </Row>
+
+          <div className="mb-4">
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <h5 className="fw-bold d-flex align-items-center gap-2 mb-0">
+                <i className="bi bi-palette2"></i>
+                Versiones de la camiseta
+              </h5>
+              <Button variant="outline-primary" size="sm" onClick={addNewVersion}>
+                <i className="bi bi-plus-circle me-2"></i>
+                Añadir versión
+              </Button>
+            </div>
+
+            {versions.map((version, index) => (
+              <Card key={version.id} className="border-0 shadow-sm mb-3">
+                <Card.Body>
+                  <div className="d-flex justify-content-between align-items-start mb-3">
+                    <div className="d-flex align-items-start gap-2">
+                      <Badge bg="primary">#{index + 1}</Badge>
+                      <div>
+                        <span className="fw-semibold d-block">{version.label || `Versión ${index + 1}`}</span>
+                        <div className="d-flex align-items-center gap-2 small text-muted">
+                          <span>Total disponible:</span>
+                          <Badge bg={version.availableStock > 0 ? 'success' : 'secondary'}>
+                            {version.availableStock > 0 ? `${version.availableStock} unidades` : 'Sin stock'}
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="d-flex align-items-center gap-2">
+                      <Form.Check
+                        type="radio"
+                        name="defaultVersion"
+                        label="Versión principal"
+                        checked={defaultVersionId === version.id}
+                        onChange={() => handleSetDefaultVersion(version.id)}
+                      />
+                      <Button
+                        variant="outline-danger"
+                        size="sm"
+                        onClick={() => removeVersion(version.id)}
+                        disabled={versions.length === 1}
+                      >
+                        <i className="bi bi-trash"></i>
+                      </Button>
+                    </div>
+                  </div>
+
+                  <Row className="g-3">
+                    <Col md={4}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Nombre de la versión *</Form.Label>
+                        <Form.Control
+                          type="text"
+                          value={version.label}
+                          placeholder="Ej: Local, Visitante, Tercera"
+                          onChange={(e) => handleVersionLabelChange(version.id, e.target.value)}
+                        />
+                      </Form.Group>
+
+                      <Form.Group>
+                        <Form.Label>Imagen principal *</Form.Label>
+                        <Form.Control
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            handleVersionImageSelect(version.id, e.target.files);
+                            e.target.value = '';
+                          }}
+                        />
+                        <Form.Text className="text-muted">
+                          Sube la foto de esta versión directamente desde tu computadora.
+                        </Form.Text>
+                        {(versionPreviews[version.id] || version.imageUrl) && (
+                          <div className="mt-3 text-center">
+                            <Image
+                              src={versionPreviews[version.id] || version.imageUrl}
+                              alt={version.label || `Previsualización versión ${index + 1}`}
+                              fluid
+                              rounded
+                              className="border"
+                            />
+                            <Button
+                              variant="link"
+                              size="sm"
+                              className="mt-2"
+                              onClick={() => handleVersionImageClear(version.id)}
+                            >
+                              Quitar imagen
+                            </Button>
+                          </div>
+                        )}
+                      </Form.Group>
+                    </Col>
+                    <Col md={8}>
+                      <div className="d-flex justify-content-between align-items-center mb-2">
+                        <span className="fw-semibold">Stock por talla</span>
+                        <Badge bg={version.availableStock > 0 ? 'success' : 'secondary'}>
+                          {version.availableStock > 0 ? `${version.availableStock} en inventario` : 'Sin stock cargado'}
+                        </Badge>
+                      </div>
+                      <Row className="g-2">
+                        {JERSEY_SIZE_OPTIONS.map((size) => {
+                          const entry = version.sizeStocks.find((item) => item.code === size.code) || {
+                            code: size.code,
+                            quantity: 0,
+                          };
+
+                          return (
+                            <Col md={6} key={`${version.id}-${size.code}`}>
+                              <Form.Group className="p-3 border rounded-3 bg-light-subtle h-100">
+                                <Form.Label className="fw-semibold mb-1">{size.label}</Form.Label>
+                                <InputGroup size="sm">
+                                  <InputGroup.Text>Cantidad</InputGroup.Text>
+                                  <Form.Control
+                                    type="number"
+                                    min={0}
+                                    value={entry.quantity}
+                                    onChange={(e) => handleVersionSizeQuantityChange(version.id, size.code, Number(e.target.value))}
+                                    onBlur={(e) => handleVersionSizeQuantityChange(version.id, size.code, Number(e.target.value))}
+                                  />
+                                </InputGroup>
+                                <Form.Text className="text-muted">{size.description}</Form.Text>
+                              </Form.Group>
+                            </Col>
+                          );
+                        })}
+                      </Row>
+                    </Col>
+                  </Row>
+                </Card.Body>
+              </Card>
+            ))}
+          </div>
 
           {/* Subcategoría, dependiente de la categoría seleccionada */}
           <Row>
@@ -690,83 +1125,6 @@ export default function ProductFormModal({ show, onHide, product, onProductSaved
             </div>
           </Form.Group>
 
-          {/* Imágenes existentes */}
-          {images.length > 0 && (
-            <Form.Group className="mb-3">
-              <Form.Label>Imágenes Actuales</Form.Label>
-              <div className="d-flex flex-wrap gap-2">
-                {images.map((image, index) => (
-                  <div key={index} className="position-relative">
-                    <Image
-                      src={image}
-                      alt={`Producto ${index + 1}`}
-                      width={100}
-                      height={100}
-                      style={{ objectFit: 'cover' }}
-                      className="rounded border"
-                    />
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      className="position-absolute top-0 end-0"
-                      style={{ transform: 'translate(50%, -50%)' }}
-                      onClick={() => removeExistingImage(index)}
-                    >
-                      <i className="bi bi-x"></i>
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </Form.Group>
-          )}
-
-          {/* Nuevas imágenes */}
-          <Form.Group className="mb-3">
-            <Form.Label>
-              <i className="bi bi-camera me-2"></i>
-              {images.length > 0 ? 'Agregar Más Imágenes desde tu Computadora' : 'Subir Imágenes desde tu Computadora'}
-            </Form.Label>
-            <Form.Control
-              type="file"
-              multiple
-              accept="image/jpeg,image/jpg,image/png,image/webp"
-              onChange={handleFileSelect}
-            />
-            <Form.Text className="text-muted">
-              <strong>📸 Selecciona imágenes directamente desde tu computadora</strong>
-              <br />
-              Formatos permitidos: JPG, PNG, WebP. Máximo 5MB por imagen, 3MB total.
-              <br />
-              <small className="text-info">
-                ✨ Sistema inteligente: Las imágenes se comprimen automáticamente para optimizar el almacenamiento.
-                Intentará subir a Firebase Storage, con sistema de respaldo automático si hay problemas.
-              </small>
-            </Form.Text>
-            
-            {selectedFiles.length > 0 && (
-              <div className="mt-2">
-                <div className="fw-bold mb-2">📁 Archivos seleccionados desde tu computadora:</div>
-                {selectedFiles.map((file, index) => (
-                  <div key={index} className="d-flex align-items-center justify-content-between p-2 border rounded mb-1">
-                    <div>
-                      <strong>{file.name}</strong>
-                      <br />
-                      <small className="text-muted">
-                        {(file.size / 1024 / 1024).toFixed(2)} MB • {file.type}
-                      </small>
-                    </div>
-                    <Button
-                      variant="outline-danger"
-                      size="sm"
-                      onClick={() => removeSelectedFile(index)}
-                    >
-                      <i className="bi bi-x"></i>
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </Form.Group>
         </Modal.Body>
 
         <Modal.Footer>
@@ -777,7 +1135,7 @@ export default function ProductFormModal({ show, onHide, product, onProductSaved
             {loading ? (
               <>
                 <Spinner animation="border" size="sm" className="me-2" />
-                {selectedFiles.length > 0 ? 'Subiendo imágenes reales...' : (isEditing ? 'Actualizando...' : 'Creando...')}
+                {isEditing ? 'Actualizando...' : 'Creando...'}
               </>
             ) : (
               <>

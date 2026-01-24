@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1200" height="700" viewBox="0 0 1200 700" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="collab-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#03181B"/>
+      <stop offset="50%" stop-color="#2A1030"/>
+      <stop offset="100%" stop-color="#5A0C3C"/>
+    </linearGradient>
+    <radialGradient id="collab-glow" cx="0.5" cy="0.5" r="0.7">
+      <stop offset="0%" stop-color="rgba(210, 63, 180, 0.28)"/>
+      <stop offset="100%" stop-color="rgba(210, 63, 180, 0)"/>
+    </radialGradient>
+    <linearGradient id="collab-jersey" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#D23FB4"/>
+      <stop offset="100%" stop-color="#FF6E6E"/>
+    </linearGradient>
+    <linearGradient id="collab-panels" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2A1030"/>
+      <stop offset="100%" stop-color="#7C1C5A"/>
+    </linearGradient>
+    <linearGradient id="collab-trim" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#FFE7F8"/>
+      <stop offset="100%" stop-color="#FFDDEE"/>
+    </linearGradient>
+    <linearGradient id="collab-stripe" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.75)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0.06)"/>
+    </linearGradient>
+    <filter id="collab-shadow" x="320" y="20" width="820" height="660" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feGaussianBlur in="BackgroundImageFix" stdDeviation="18"/>
+      <feComposite in2="SourceAlpha" operator="in" result="effect1_backgroundBlur"/>
+      <feBlend in="SourceGraphic" in2="effect1_backgroundBlur" mode="normal" result="shape"/>
+      <feDropShadow dx="0" dy="28" stdDeviation="36" flood-color="rgba(0,0,0,0.35)"/>
+    </filter>
+    <pattern id="collab-grid" width="72" height="72" patternUnits="userSpaceOnUse" patternTransform="rotate(22)">
+      <path d="M0 0L72 0 72 72" stroke="rgba(255,255,255,0.06)" stroke-width="2" fill="none"/>
+    </pattern>
+  </defs>
+  <rect width="1200" height="700" rx="38" fill="url(#collab-bg)"/>
+  <rect width="1200" height="700" rx="38" fill="url(#collab-glow)"/>
+  <rect width="1200" height="700" rx="38" fill="url(#collab-grid)" opacity="0.18"/>
+  <g filter="url(#collab-shadow)">
+    <path d="M676 108L728 66L852 66L904 108H996L958 214C954 224 952 236 952 248V558C952 572 940 584 924 584H648C632 584 620 572 620 558V248C620 236 618 224 614 214L576 108H676Z" fill="url(#collab-jersey)"/>
+    <path d="M676 108L728 66L776 34C792 24 820 24 836 34L884 66L932 108H920L868 60H772L720 108H676Z" fill="url(#collab-panels)"/>
+    <path d="M576 108L614 214C618 224 620 236 620 248V558C620 572 632 584 648 584H536C520 584 508 572 508 558V236C508 224 502 212 492 204L436 160L472 108H576Z" fill="url(#collab-panels)"/>
+    <path d="M952 248C952 236 954 224 958 214L996 108H1080L1042 184C1032 202 1026 222 1026 242V558C1026 572 1014 584 998 584H924C940 584 952 572 952 558V248Z" fill="url(#collab-panels)"/>
+    <path d="M732 108H820C836 108 848 96 848 80V70H704V80C704 96 716 108 732 108Z" fill="url(#collab-trim)"/>
+    <path d="M648 548L920 212V312L648 648V548Z" fill="url(#collab-stripe)" opacity="0.6"/>
+    <path d="M744 188H848C856 188 862 194 862 202V220H730V202C730 194 736 188 744 188Z" fill="rgba(255,255,255,0.1)"/>
+    <path d="M794 148C814 148 830 164 830 184C830 204 814 220 794 220C774 220 758 204 758 184C758 164 774 148 794 148Z" fill="rgba(255,255,255,0.18)"/>
+  </g>
+  <g opacity="0.28">
+    <circle cx="240" cy="190" r="120" stroke="rgba(210,63,180,0.18)" stroke-width="2" fill="none"/>
+    <circle cx="290" cy="360" r="140" stroke="rgba(255,110,110,0.18)" stroke-width="2" fill="none"/>
+    <path d="M160 520C240 452 360 452 440 520" stroke="rgba(255,255,255,0.12)" stroke-width="2" fill="none"/>
+    <path d="M180 456C260 396 360 396 440 456" stroke="rgba(210,63,180,0.18)" stroke-width="2" fill="none"/>
+  </g>
+  <g opacity="0.4">
+    <path d="M1040 180C970 112 870 112 800 180" stroke="rgba(255,110,110,0.26)" stroke-width="2" fill="none"/>
+    <path d="M1020 242C950 190 870 190 800 242" stroke="rgba(210,63,180,0.22)" stroke-width="2" fill="none"/>
+    <path d="M996 304C936 262 868 262 808 304" stroke="rgba(255,255,255,0.12)" stroke-width="2" fill="none"/>
+  </g>
+</svg>

@@ -1,401 +1,478 @@
-/* Tema de Cosméticos - Variables CSS */
+/* SpideySports Dark Theme Overrides */
 :root {
-  /* Paleta principal de colores */
-  --cosmetic-primary: #8C9C84;      /* Verde olivo elegante - botones */
-  --cosmetic-secondary: #F4F0E8;    /* Beige crema - backgrounds */
-  --cosmetic-tertiary: #3A3029;     /* Marrón oscuro - textos principales */
-  --cosmetic-accent: #D28A6D;       /* Coral cálido - atención especial */
-  
+  /* Paleta principal en sintonía con SpideySports */
+  --cosmetic-primary: #037b90;
+  --cosmetic-secondary: rgba(3, 24, 27, 0.94);
+  --cosmetic-tertiary: #f5fbfc;
+  --cosmetic-accent: #900000;
 
+  --cosmetic-primary-dark: #026776;
+  --cosmetic-primary-light: rgba(3, 123, 144, 0.65);
+  --cosmetic-secondary-dark: rgba(2, 17, 20, 0.98);
+  --cosmetic-tertiary-light: rgba(245, 251, 252, 0.75);
+  --cosmetic-accent-dark: #b10000;
+  --cosmetic-accent-light: rgba(144, 0, 0, 0.6);
 
-  .btn-cosmetic-primary,
-  .btn-cosmetic-primary:focus,
-.btn-cosmetic-primary:active {
-  background-color: var(--cosmetic-primary) !important;
-  border-color: var(--cosmetic-primary) !important;
-  color: white !important;
-}
-  /* Variaciones para hover y estados */
-  --cosmetic-primary-dark: #7A8A72;
-  --cosmetic-primary-light: #9CAB94;
-  --cosmetic-secondary-dark: #EAE6DE;
-  --cosmetic-tertiary-light: #5A4F46;
-  --cosmetic-accent-dark: #C4795C;
-  --cosmetic-accent-light: #E099A4;
-  
-  /* Sobrescribir variables de Bootstrap completamente */
   --bs-primary: var(--cosmetic-primary);
-  --bs-primary-rgb: 140, 156, 132;
+  --bs-primary-rgb: 3, 123, 144;
   --bs-secondary: var(--cosmetic-secondary);
-  --bs-secondary-rgb: 244, 240, 232;
-  --bs-dark: var(--cosmetic-tertiary);
-  --bs-dark-rgb: 58, 48, 41;
+  --bs-secondary-rgb: 3, 24, 27;
+  --bs-dark: #010a0c;
+  --bs-dark-rgb: 1, 10, 12;
   --bs-warning: var(--cosmetic-accent);
-  --bs-warning-rgb: 210, 138, 109;
-  --bs-success: var(--cosmetic-primary);
-  --bs-success-rgb: 140, 156, 132;
-  --bs-info: var(--cosmetic-accent);
-  --bs-info-rgb: 210, 138, 109;
+  --bs-warning-rgb: 144, 0, 0;
+  --bs-success: #1ea896;
+  --bs-success-rgb: 30, 168, 150;
+  --bs-info: var(--cosmetic-primary);
+  --bs-info-rgb: 3, 123, 144;
   --bs-danger: var(--cosmetic-accent);
-  --bs-danger-rgb: 210, 138, 109;
-  
-  /* Backgrounds y borders */
-  --bs-body-bg: var(--cosmetic-secondary);
+  --bs-danger-rgb: 144, 0, 0;
+
+  --bs-body-bg: #03181b;
   --bs-body-color: var(--cosmetic-tertiary);
-  --bs-border-color: var(--cosmetic-primary-light);
+  --bs-border-color: rgba(3, 123, 144, 0.25);
 }
 
-/* Clases de utilidad personalizadas */
+/* Utilidades de fondo y texto */
 .bg-cosmetic-primary { background-color: var(--cosmetic-primary) !important; }
 .bg-cosmetic-secondary { background-color: var(--cosmetic-secondary) !important; }
-.bg-cosmetic-tertiary { background-color: var(--cosmetic-tertiary) !important; }
+.bg-cosmetic-tertiary { background-color: var(--cosmetic-tertiary) !important; color: #010a0c !important; }
 .bg-cosmetic-accent { background-color: var(--cosmetic-accent) !important; }
 
 .text-cosmetic-primary { color: var(--cosmetic-primary) !important; }
-.text-cosmetic-secondary { color: var(--cosmetic-secondary) !important; }
+.text-cosmetic-secondary { color: var(--cosmetic-tertiary-light) !important; }
 .text-cosmetic-tertiary { color: var(--cosmetic-tertiary) !important; }
 .text-cosmetic-accent { color: var(--cosmetic-accent) !important; }
 
 .border-cosmetic-primary { border-color: var(--cosmetic-primary) !important; }
-.border-cosmetic-secondary { border-color: var(--cosmetic-secondary) !important; }
+.border-cosmetic-secondary { border-color: rgba(3, 123, 144, 0.28) !important; }
 .border-cosmetic-accent { border-color: var(--cosmetic-accent) !important; }
 
-/* Botones personalizados */
-.btn-cosmetic-primary {
-  background-color: var(--cosmetic-primary);
-  border-color: var(--cosmetic-primary);
-  color: white;
+/* Botones principales */
+.btn-cosmetic-primary,
+.btn-cosmetic-primary:focus,
+.btn-cosmetic-primary:active {
+  background-color: var(--cosmetic-primary) !important;
+  border-color: var(--cosmetic-primary) !important;
+  color: #ffffff !important;
+  box-shadow: 0 12px 24px -16px rgba(3, 123, 144, 0.55);
 }
 
 .btn-cosmetic-primary:hover {
   background-color: var(--cosmetic-primary-dark) !important;
   border-color: var(--cosmetic-primary-dark) !important;
-  color: white;
 }
 
 .btn-cosmetic-accent {
   background-color: var(--cosmetic-accent);
   border-color: var(--cosmetic-accent);
-  color: white;
+  color: #ffffff;
 }
 
 .btn-cosmetic-accent:hover {
   background-color: var(--cosmetic-accent-dark);
   border-color: var(--cosmetic-accent-dark);
-  color: white;
+  color: #ffffff;
 }
 
 .btn-outline-cosmetic-primary {
   color: var(--cosmetic-primary);
   border-color: var(--cosmetic-primary);
-  background-color: transparent;
+  background: transparent;
 }
 
 .btn-outline-cosmetic-primary:hover {
-  background-color: var(--cosmetic-primary);
-  border-color: var(--cosmetic-primary);
-  color: white;
+  background: var(--cosmetic-primary);
+  color: #ffffff;
 }
 
 .btn-outline-cosmetic-secondary {
   color: var(--cosmetic-tertiary);
-  border-color: var(--cosmetic-secondary);
-  background-color: transparent;
+  border-color: rgba(3, 123, 144, 0.25);
+  background: transparent;
 }
 
 .btn-outline-cosmetic-secondary:hover {
   color: var(--cosmetic-tertiary);
-  background-color: var(--cosmetic-secondary);
-  border-color: var(--cosmetic-secondary);
+  background: rgba(3, 123, 144, 0.15);
+  border-color: rgba(3, 123, 144, 0.4);
 }
 
 .btn-outline-cosmetic-accent {
   color: var(--cosmetic-accent);
   border-color: var(--cosmetic-accent);
-  background-color: transparent;
+  background: transparent;
 }
 
 .btn-outline-cosmetic-accent:hover {
-  color: var(--cosmetic-secondary);
-  background-color: var(--cosmetic-accent);
+  color: #ffffff;
+  background: var(--cosmetic-accent);
   border-color: var(--cosmetic-accent);
 }
 
-.btn-cosmetic-accent {
-  background-color: var(--cosmetic-accent);
-  border-color: var(--cosmetic-accent);
-  color: var(--cosmetic-secondary);
-}
-
-.btn-cosmetic-accent:hover {
-  background-color: var(--cosmetic-accent-hover);
-  border-color: var(--cosmetic-accent-hover);
-  color: var(--cosmetic-secondary);
-}
-
-/* Estilos para cards y componentes */
-.card-cosmetic {
-  background-color: white;
-  border: 1px solid var(--cosmetic-primary-light);
-  border-radius: 1rem;
-}
-
-.card-cosmetic:hover {
-  box-shadow: 0 8px 25px rgba(140, 156, 132, 0.15);
-  transform: translateY(-2px);
-  transition: all 0.3s ease;
-}
-
-/* Navbar personalizada */
-.navbar-cosmetic {
-  background-color: white !important;
-  border-bottom: 2px solid var(--cosmetic-primary);
-  box-shadow: 0 2px 10px rgba(140, 156, 132, 0.1);
-}
-
-.navbar-cosmetic .navbar-brand {
+/* Tarjetas y contenedores */
+.card-cosmetic,
+.card,
+.modal-content,
+.offcanvas,
+.dropdown-menu,
+.toast,
+.list-group-item {
+  background: rgba(5, 44, 51, 0.92) !important;
+  border: 1px solid rgba(3, 123, 144, 0.18) !important;
   color: var(--cosmetic-tertiary) !important;
-  font-weight: bold;
+  box-shadow: 0 20px 60px -30px rgba(3, 123, 144, 0.45);
 }
 
-.navbar-cosmetic .nav-link {
+.card-cosmetic:hover,
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 30px 80px -30px rgba(3, 123, 144, 0.5);
+}
+
+/* Navbar */
+.navbar-cosmetic,
+.navbar,
+.topbar-mobile {
+  background: rgba(3, 24, 27, 0.96) !important;
+  border-bottom: 1px solid rgba(3, 123, 144, 0.25) !important;
+  box-shadow: 0 20px 40px -32px rgba(0, 0, 0, 0.75);
+}
+
+.navbar-cosmetic .navbar-brand,
+.navbar .navbar-brand {
   color: var(--cosmetic-tertiary) !important;
+  font-weight: 700;
 }
 
-.navbar-cosmetic .nav-link:hover {
+.navbar-cosmetic .nav-link,
+.navbar .nav-link {
+  color: rgba(245, 251, 252, 0.7) !important;
+}
+
+.navbar-cosmetic .nav-link:hover,
+.navbar .nav-link:hover,
+.navbar .nav-link.active {
+  color: var(--cosmetic-tertiary) !important;
+  background: rgba(3, 123, 144, 0.18);
+  border-radius: 0.6rem;
+}
+
+/* Footer */
+.footer-cosmetic,
+footer {
+  background: rgba(2, 17, 20, 0.96) !important;
+  color: rgba(245, 251, 252, 0.75) !important;
+  border-top: 1px solid rgba(3, 123, 144, 0.25) !important;
+}
+
+.footer-cosmetic h5,
+.footer-cosmetic h6 {
   color: var(--cosmetic-primary) !important;
 }
 
-/* Footer personalizado */
-.footer-cosmetic {
-  background-color: var(--cosmetic-tertiary);
-  color: var(--cosmetic-secondary);
-}
+/* Efectos utilitarios */
+.hover-cosmetic-accent:hover { color: var(--cosmetic-accent) !important; transition: color 0.18s ease; }
+.hover-scale:hover { transform: scale(1.04); transition: transform 0.25s ease; }
 
-.footer-cosmetic h5, .footer-cosmetic h6 {
-  color: var(--cosmetic-accent);
-}
-
-/* Efectos de hover especiales */
-.hover-cosmetic-accent:hover {
-  color: var(--cosmetic-accent) !important;
-  transition: color 0.3s ease;
-}
-
-.hover-scale:hover {
-  transform: scale(1.05);
-  transition: transform 0.3s ease;
-}
-
-/* Badges personalizados */
-.badge-cosmetic-primary {
-  background-color: var(--cosmetic-primary);
-  color: white;
+/* Badges */
+.badge-cosmetic-primary,
+.badge.bg-primary {
+  background: var(--cosmetic-primary) !important;
+  color: #ffffff !important;
 }
 
 .badge-cosmetic-secondary {
-  background-color: var(--cosmetic-secondary);
-  color: var(--cosmetic-tertiary);
+  background: rgba(3, 123, 144, 0.25) !important;
+  color: var(--cosmetic-tertiary) !important;
 }
 
-.badge-cosmetic-accent {
-  background-color: var(--cosmetic-accent);
-  color: white;
+.badge-cosmetic-accent,
+.badge.bg-danger {
+  background: var(--cosmetic-accent) !important;
+  color: #ffffff !important;
 }
 
-/* Alerts personalizados */
-.alert-cosmetic-success {
-  background-color: #d4edda;
-  border-color: var(--cosmetic-primary);
-  color: var(--cosmetic-tertiary);
-  border: 1px solid;
+.badge.bg-success { background: #1ea896 !important; }
+.badge.bg-warning { background: #f2a65a !important; color: #0c0c0c !important; }
+
+/* Alertas */
+.alert-cosmetic-success,
+.alert-success,
+.alert-primary {
+  background: rgba(30, 168, 150, 0.15) !important;
+  border-color: rgba(30, 168, 150, 0.35) !important;
+  color: var(--cosmetic-tertiary) !important;
 }
 
-.alert-cosmetic-danger {
-  background-color: #f8d7da;
-  border-color: var(--cosmetic-accent);
-  color: var(--cosmetic-tertiary);
-  border: 1px solid;
-}
-
-.alert-cosmetic-warning {
-  background-color: #fff3cd;
-  border-color: var(--cosmetic-accent);
-  color: var(--cosmetic-tertiary);
-  border: 1px solid;
+.alert-cosmetic-danger,
+.alert-danger,
+.alert-warning {
+  background: rgba(144, 0, 0, 0.14) !important;
+  border-color: rgba(144, 0, 0, 0.45) !important;
+  color: #ffe5e5 !important;
 }
 
 .alert-cosmetic-info {
-  background-color: var(--cosmetic-secondary);
-  border-color: var(--cosmetic-primary);
-  color: var(--cosmetic-tertiary);
-  border: 1px solid;
+  background: rgba(3, 123, 144, 0.16) !important;
+  border-color: rgba(3, 123, 144, 0.35) !important;
+  color: var(--cosmetic-tertiary) !important;
 }
 
 /* Formularios */
-.form-control:focus {
-  border-color: var(--cosmetic-primary);
-  box-shadow: 0 0 0 0.25rem rgba(140, 156, 132, 0.25);
+.form-control,
+.form-select,
+input,
+textarea {
+  background: rgba(4, 34, 39, 0.92) !important;
+  border: 1px solid rgba(3, 123, 144, 0.25) !important;
+  color: var(--cosmetic-tertiary) !important;
+}
+
+.form-control:focus,
+.form-select:focus,
+input:focus,
+textarea:focus {
+  border-color: var(--cosmetic-primary) !important;
+  box-shadow: 0 0 0 2px rgba(3, 123, 144, 0.25) !important;
+}
+
+.form-control::placeholder,
+.form-select::placeholder,
+input::placeholder,
+textarea::placeholder {
+  color: rgba(245, 251, 252, 0.45) !important;
+}
+
+.form-check-input {
+  background: transparent !important;
+  border-color: rgba(3, 123, 144, 0.35) !important;
+}
+
+.form-check-input:checked {
+  background-color: var(--cosmetic-primary) !important;
+  border-color: var(--cosmetic-primary) !important;
 }
 
 /* Paginación */
 .pagination .page-link {
-  color: var(--cosmetic-primary);
-  border-color: var(--cosmetic-primary-light);
+  color: rgba(245, 251, 252, 0.72) !important;
+  border-color: rgba(3, 123, 144, 0.25) !important;
+  background: transparent !important;
 }
 
 .pagination .page-item.active .page-link {
-  background-color: var(--cosmetic-primary);
-  border-color: var(--cosmetic-primary);
+  background: var(--cosmetic-primary) !important;
+  border-color: var(--cosmetic-primary) !important;
+  color: #ffffff !important;
 }
 
 .pagination .page-link:hover {
-  background-color: var(--cosmetic-secondary);
-  border-color: var(--cosmetic-primary);
-  color: var(--cosmetic-primary-dark);
+  background: rgba(3, 123, 144, 0.15) !important;
+  border-color: rgba(3, 123, 144, 0.35) !important;
 }
 
-/* Alertas personalizadas */
-.alert-cosmetic-success {
-  background-color: rgba(140, 156, 132, 0.1);
-  border-color: var(--cosmetic-primary);
-  color: var(--cosmetic-tertiary);
-}
-
-.alert-cosmetic-warning {
-  background-color: rgba(210, 138, 109, 0.1);
-  border-color: var(--cosmetic-accent);
-  color: var(--cosmetic-tertiary);
-}
-
-/* Sobrescribir clases de Bootstrap automáticamente */
+/* Sobrescrituras genéricas */
 .text-primary { color: var(--cosmetic-primary) !important; }
-.bg-primary { background-color: var(--cosmetic-primary) !important; }
-.btn-primary { 
-  background-color: var(--cosmetic-primary) !important; 
-  border-color: var(--cosmetic-primary) !important; 
-  color: white !important;
+.bg-primary { background: var(--cosmetic-primary) !important; }
+.btn-primary {
+  background: var(--cosmetic-primary) !important;
+  border-color: var(--cosmetic-primary) !important;
+  color: #ffffff !important;
 }
-.btn-primary:hover, .btn-primary:focus { 
-  background-color: var(--cosmetic-primary-dark) !important; 
-  border-color: var(--cosmetic-primary-dark) !important; 
+.btn-primary:hover,
+.btn-primary:focus {
+  background: var(--cosmetic-primary-dark) !important;
+  border-color: var(--cosmetic-primary-dark) !important;
 }
 
-.text-success { color: var(--cosmetic-primary) !important; }
-.bg-success { background-color: var(--cosmetic-primary) !important; }
-.btn-success { 
-  background-color: var(--cosmetic-primary) !important; 
-  border-color: var(--cosmetic-primary) !important; 
+.text-success { color: #1ea896 !important; }
+.bg-success { background-color: #1ea896 !important; }
+.btn-success {
+  background: #1ea896 !important;
+  border-color: #1ea896 !important;
+  color: #010a0c !important;
 }
 
 .text-danger { color: var(--cosmetic-accent) !important; }
-.bg-danger { background-color: var(--cosmetic-accent) !important; }
-.btn-danger { 
-  background-color: var(--cosmetic-accent) !important; 
-  border-color: var(--cosmetic-accent) !important; 
+.bg-danger { background: var(--cosmetic-accent) !important; }
+.btn-danger {
+  background: var(--cosmetic-accent) !important;
+  border-color: var(--cosmetic-accent) !important;
+  color: #ffffff !important;
 }
 
-.text-info { color: var(--cosmetic-accent) !important; }
-.bg-info { background-color: var(--cosmetic-accent) !important; }
-.btn-info { 
-  background-color: var(--cosmetic-accent) !important; 
-  border-color: var(--cosmetic-accent) !important; 
+.text-info { color: var(--cosmetic-primary) !important; }
+.bg-info { background: var(--cosmetic-primary) !important; }
+.btn-info {
+  background: var(--cosmetic-primary) !important;
+  border-color: var(--cosmetic-primary) !important;
+  color: #ffffff !important;
 }
 
 .border-primary { border-color: var(--cosmetic-primary) !important; }
-.border-success { border-color: var(--cosmetic-primary) !important; }
+.border-success { border-color: rgba(30, 168, 150, 0.45) !important; }
 .border-danger { border-color: var(--cosmetic-accent) !important; }
-.border-info { border-color: var(--cosmetic-accent) !important; }
+.border-info { border-color: rgba(3, 123, 144, 0.35) !important; }
 
-/* Spinner/Loading colors */
-.spinner-border-primary { color: var(--cosmetic-primary) !important; }
+/* Spinners */
+.spinner-border-primary,
 .spinner-border.text-primary { color: var(--cosmetic-primary) !important; }
 
-/* Nav pills active state */
-.nav-pills .nav-link.active { 
-  background-color: var(--cosmetic-primary) !important; 
-  color: white !important;
+/* Nav pills */
+.nav-pills .nav-link.active {
+  background: var(--cosmetic-primary) !important;
+  color: #ffffff !important;
+  border-radius: 999px;
 }
 
-/* Badge colors */
-.badge.bg-primary { background-color: var(--cosmetic-primary) !important; }
-.badge.bg-success { background-color: var(--cosmetic-primary) !important; }
-.badge.bg-danger { background-color: var(--cosmetic-accent) !important; }
-.badge.bg-info { background-color: var(--cosmetic-accent) !important; }
-
-/* Alert colors */
-.alert-primary { 
-  background-color: rgba(140, 156, 132, 0.1) !important;
-  border-color: var(--cosmetic-primary) !important;
-  color: var(--cosmetic-tertiary) !important;
-}
-.alert-success { 
-  background-color: rgba(140, 156, 132, 0.1) !important;
-  border-color: var(--cosmetic-primary) !important;
-  color: var(--cosmetic-tertiary) !important;
-}
-.alert-danger { 
-  background-color: rgba(210, 138, 109, 0.1) !important;
-  border-color: var(--cosmetic-accent) !important;
-  color: var(--cosmetic-tertiary) !important;
-}
-
-
-/*Botones para el delivery*/
-.btn-admin {
-  background-color: transparent !important;
-  color: var(--cosmetic-terciary) !important;
-  border: none !important;
+/* Componentes administrativos y delivery */
+.btn-admin,
+.btn-profile,
+.btn-adminOrders,
+.btn-profile-secondary {
+  background: transparent !important;
+  color: rgba(245, 251, 252, 0.72) !important;
+  border: 1px solid rgba(3, 123, 144, 0.3) !important;
   transition: all 0.2s ease-in-out;
 }
 
 .btn-admin:hover,
-.btn-admin:focus {
-  background-color: var(--cosmetic-primary-dark) !important;
-  color: white !important;
+.btn-profile:hover,
+.btn-adminOrders:hover,
+.btn-profile-secondary:hover,
+.btn-admin:focus,
+.btn-profile:focus,
+.btn-adminOrders:focus,
+.btn-profile-secondary:focus {
+  background: rgba(3, 123, 144, 0.22) !important;
+  color: var(--cosmetic-tertiary) !important;
+  border-color: rgba(3, 123, 144, 0.45) !important;
 }
 
-/*btn orders*/
-.btn-adminOrders {
-  background-color: transparent !important;
-  color: var(--cosmetic-terciary) !important;
-  border: 1px solid var(--cosmetic-accent) !important;
-  transition: all 0.2s ease-in-out;
+.btn-adminOrders,
+.btn-profile {
+  border-color: var(--cosmetic-accent) !important;
 }
 
 .btn-adminOrders:hover,
-.btn-adminOrders:focus {
-  background-color: var(--cosmetic-accent) !important;
-  color: white !important;
+.btn-profile:hover {
+  background: rgba(144, 0, 0, 0.2) !important;
+  color: #ffe5e5 !important;
+  border-color: var(--cosmetic-accent) !important;
 }
 
-
-/* Botones principales (guardar, editar, etc.) */
-.btn-profile {
-  background-color: transparent !important;
-  color: var(--cosmetic-terciary) !important;
-  border: 1px solid var(--cosmetic-accent) !important;
-  transition: all 0.2s ease-in-out;
-}
-
-.btn-profile:hover,
-.btn-profile:focus {
-  background-color: var(--cosmetic-accent) !important;
-  color: white !important;
-}
-
-/* Botones secundarios (cancelar, acciones menos importantes) */
-.btn-profile-secondary {
-  background-color: transparent !important;
-  color: var(--cosmetic-accent) !important;
-  border: 1px solid var(--cosmetic-secondary) !important;
-  transition: all 0.2s ease-in-out;
-}
-
-.btn-profile-secondary:hover,
-.btn-profile-secondary:focus {
-  background-color: var(--cosmetic-secondary) !important;
+/* Tablas */
+.table,
+.table-striped > tbody > tr:nth-of-type(odd) {
+  background: rgba(5, 44, 51, 0.6) !important;
   color: var(--cosmetic-tertiary) !important;
+}
+
+.table > :not(caption) > * > * {
+  background: rgba(5, 44, 51, 0.6) !important;
+  border-color: rgba(3, 123, 144, 0.18) !important;
+}
+
+.table thead th {
+  color: var(--cosmetic-tertiary) !important;
+  border-bottom: 1px solid rgba(3, 123, 144, 0.35) !important;
+}
+
+/* Paneles y acordeones */
+.accordion-button {
+  background: rgba(3, 24, 27, 0.85) !important;
+  color: var(--cosmetic-tertiary) !important;
+}
+
+.accordion-button:not(.collapsed) {
+  color: var(--cosmetic-tertiary) !important;
+  background: rgba(3, 123, 144, 0.16) !important;
+  box-shadow: inset 0 -1px 0 rgba(3, 123, 144, 0.3);
+}
+
+.accordion-item {
+  border-color: rgba(3, 123, 144, 0.18) !important;
+  background: rgba(5, 44, 51, 0.92) !important;
+}
+
+/* Breadcrumbs, tabs y enlaces de navegación secundarios */
+.nav-tabs .nav-link {
+  color: rgba(245, 251, 252, 0.6) !important;
+  border-color: transparent transparent rgba(3, 123, 144, 0.2) !important;
+  background: transparent;
+}
+
+.nav-tabs .nav-link.active {
+  color: var(--cosmetic-tertiary) !important;
+  background: rgba(3, 123, 144, 0.18) !important;
+  border-color: rgba(3, 123, 144, 0.35) rgba(3, 123, 144, 0.35) transparent !important;
+}
+
+.breadcrumb-item + .breadcrumb-item::before {
+  color: rgba(245, 251, 252, 0.35);
+}
+
+/* Placeholders y skeletons */
+.skeleton,
+.placeholder-wave .placeholder {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Offcanvas y backdrop */
+.offcanvas-backdrop,
+.modal-backdrop {
+  background: rgba(3, 24, 27, 0.75) !important;
+  backdrop-filter: blur(4px);
+}
+
+/* Listados y badges secundarios */
+.list-group-item {
+  background: rgba(4, 34, 39, 0.92) !important;
+  color: var(--cosmetic-tertiary) !important;
+}
+
+.list-group-item.active {
+  background: var(--cosmetic-primary) !important;
+  border-color: var(--cosmetic-primary) !important;
+}
+
+/* Herramientas y textos secundarios */
+.text-muted { color: rgba(245, 251, 252, 0.6) !important; }
+.small { color: rgba(245, 251, 252, 0.55) !important; }
+
+/* Avatar de comentarios */
+.avatar-comment {
+  background: rgba(3, 123, 144, 0.18) !important;
+  color: var(--cosmetic-primary) !important;
+}
+
+/* Contadores y progreso */
+.progress {
+  background: rgba(3, 123, 144, 0.15) !important;
+  border-radius: 999px;
+}
+
+.progress-bar {
+  background-image: linear-gradient(120deg, var(--cosmetic-primary), #05b7d5);
+}
+
+/* Utilidades varias */
+.divider,
+hr { border-color: rgba(255, 255, 255, 0.08) !important; }
+.shadow-sm { box-shadow: 0 12px 24px -18px rgba(3, 123, 144, 0.4) !important; }
+.shadow { box-shadow: 0 20px 40px -18px rgba(3, 123, 144, 0.35) !important; }
+
+@media (max-width: 991px) {
+  .navbar,
+  .topbar-mobile {
+    border-bottom: 1px solid rgba(3, 123, 144, 0.22) !important;
+  }
+
+  .footer-cosmetic,
+  footer {
+    padding-bottom: 3rem;
+  }
 }
 
 /* Botón de paginación normal */

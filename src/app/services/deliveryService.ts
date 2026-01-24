@@ -15,6 +15,36 @@ import { InputValidator, DataSanitizer } from '../utils/security';
 import { VALIDATION_RULES } from '../utils/securityConfig';
 import { notificationService } from './notificationService';
 import { userNotificationService } from './userNotificationService';
+import { sanitizeForFirestore } from './purchaseService';
+
+function findUndefinedPath(value: any, currentPath: string[] = []): string | null {
+  if (value === undefined) {
+    return currentPath.join('.') || '(root)';
+  }
+
+  if (value === null || typeof value !== 'object') {
+    return null;
+  }
+
+  if (Array.isArray(value)) {
+    for (let index = 0; index < value.length; index++) {
+      const result = findUndefinedPath(value[index], [...currentPath, String(index)]);
+      if (result) {
+        return result;
+      }
+    }
+    return null;
+  }
+
+  for (const [key, entry] of Object.entries(value)) {
+    const result = findUndefinedPath(entry, [...currentPath, key]);
+    if (result) {
+      return result;
+    }
+  }
+
+  return null;
+}
 
 export interface DeliveryOrder {
   id?: string;
@@ -116,7 +146,16 @@ export const createDeliveryOrder = async (purchaseData: any, userName: string, u
       ...(deliveryLocation && { deliveryLocation })
     };
 
-    const docRef = await addDoc(collection(db, 'deliveryOrders'), deliveryOrder);
+    const sanitizedDeliveryOrder = sanitizeForFirestore(deliveryOrder);
+
+    if (process.env.NODE_ENV !== 'production') {
+      const undefinedPath = findUndefinedPath(sanitizedDeliveryOrder);
+      if (undefinedPath) {
+        console.warn('[createDeliveryOrder] Datos contienen undefined tras sanitizar en', undefinedPath);
+      }
+    }
+
+    const docRef = await addDoc(collection(db, 'deliveryOrders'), sanitizedDeliveryOrder);
     
     // ✅ Actualizar el orderId con el ID del documento si no se proporcionó purchaseId
     if (!purchaseId) {
@@ -130,6 +169,7 @@ export const createDeliveryOrder = async (purchaseData: any, userName: string, u
     throw error;
   }
 };
+
 
 // ✅ Asignar orden a un repartidor (solo admin)
 export const assignOrderToDelivery = async (orderId: string, deliveryEmail: string) => {

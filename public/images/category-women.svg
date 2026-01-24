@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 300 300">
-  <!-- Categoría Mujer -->
-  <rect width="300" height="300" fill="#fde2e4"/>
-  <path d="M150,50 C130,50 115,65 115,85 C115,105 130,120 150,120 C170,120 185,105 185,85 C185,65 170,50 150,50 Z" fill="#ffffff"/>
-  <path d="M110,130 L190,130 L180,250 L160,250 L150,200 L140,250 L120,250 L110,130 Z" fill="#ffffff"/>
-  <text x="150" y="280" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" fill="#000000">Mujer</text>
-</svg>

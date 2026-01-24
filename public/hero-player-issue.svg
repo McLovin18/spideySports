@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1200" height="700" viewBox="0 0 1200 700" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="pi-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#03181B"/>
+      <stop offset="65%" stop-color="#02333A"/>
+      <stop offset="100%" stop-color="#045A66"/>
+    </linearGradient>
+    <linearGradient id="pi-jersey" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0D8FAC"/>
+      <stop offset="100%" stop-color="#06B0CF"/>
+    </linearGradient>
+    <linearGradient id="pi-panels" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#022D34"/>
+      <stop offset="100%" stop-color="#066F83"/>
+    </linearGradient>
+    <linearGradient id="pi-collar" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#F6F6F6"/>
+      <stop offset="100%" stop-color="#CFE6ED"/>
+    </linearGradient>
+    <linearGradient id="pi-stripe" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.7)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0.05)"/>
+    </linearGradient>
+    <radialGradient id="pi-glow" cx="0.5" cy="0.5" r="0.6">
+      <stop offset="0%" stop-color="rgba(6, 176, 207, 0.28)"/>
+      <stop offset="100%" stop-color="rgba(6, 176, 207, 0)"/>
+    </radialGradient>
+    <filter id="pi-shadow" x="360" y="40" width="780" height="640" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feGaussianBlur in="BackgroundImageFix" stdDeviation="16"/>
+      <feComposite in2="SourceAlpha" operator="in" result="effect1_backgroundBlur"/>
+      <feBlend in="SourceGraphic" in2="effect1_backgroundBlur" mode="normal" result="shape"/>
+      <feDropShadow dx="0" dy="26" stdDeviation="34" flood-color="rgba(0,0,0,0.32)"/>
+    </filter>
+  </defs>
+  <rect width="1200" height="700" rx="38" fill="url(#pi-bg)"/>
+  <rect width="1200" height="700" rx="38" fill="url(#pi-glow)"/>
+  <g opacity="0.24">
+    <path d="M140 160C230 92 360 92 450 160" stroke="rgba(6,176,207,0.18)" stroke-width="2" fill="none"/>
+    <path d="M170 228C250 168 360 168 440 228" stroke="rgba(255,255,255,0.12)" stroke-width="2" fill="none"/>
+    <path d="M210 296C280 244 360 244 430 296" stroke="rgba(6,176,207,0.18)" stroke-width="2" fill="none"/>
+    <path d="M250 364C310 318 360 318 420 364" stroke="rgba(255,255,255,0.1)" stroke-width="2" fill="none"/>
+    <path d="M300 430C340 398 360 398 400 430" stroke="rgba(6,176,207,0.14)" stroke-width="2" fill="none"/>
+  </g>
+  <g filter="url(#pi-shadow)">
+    <path d="M688 108L740 64L860 64L912 108H1000L962 208C958 218 956 230 956 242V554C956 568 944 580 928 580H664C648 580 636 568 636 554V242C636 230 634 218 630 208L592 108H688Z" fill="url(#pi-jersey)"/>
+    <path d="M688 108L740 64L784 34C800 24 828 24 844 34L888 64L932 108H920L868 60H772L720 108H688Z" fill="url(#pi-panels)"/>
+    <path d="M592 108L630 208C634 218 636 230 636 242V554C636 568 648 580 664 580H556C540 580 528 568 528 554V238C528 226 522 214 512 206L454 158L494 108H592Z" fill="url(#pi-panels)"/>
+    <path d="M956 242C956 230 958 218 962 208L1000 108H1086L1048 186C1038 204 1032 224 1032 244V554C1032 568 1020 580 1004 580H928C944 580 956 568 956 554V242Z" fill="url(#pi-panels)"/>
+    <path d="M744 108H828C844 108 856 96 856 80V68H716V80C716 96 728 108 744 108Z" fill="url(#pi-collar)"/>
+    <path d="M664 548L936 204V306L664 640V548Z" fill="url(#pi-stripe)" opacity="0.55"/>
+    <path d="M742 184H842C850 184 856 190 856 198V218H728V198C728 190 734 184 742 184Z" fill="rgba(255,255,255,0.08)"/>
+    <path d="M792 146C812 146 828 162 828 182C828 202 812 218 792 218C772 218 756 202 756 182C756 162 772 146 792 146Z" fill="rgba(255,255,255,0.16)"/>
+  </g>
+  <g opacity="0.35">
+    <path d="M1080 520C1020 580 920 580 860 520" stroke="rgba(6,176,207,0.18)" stroke-width="2" fill="none"/>
+    <path d="M1060 458C1000 510 920 510 860 458" stroke="rgba(255,255,255,0.12)" stroke-width="2" fill="none"/>
+    <circle cx="980" cy="350" r="120" stroke="rgba(6,176,207,0.16)" stroke-width="2" fill="none"/>
+  </g>
+</svg>

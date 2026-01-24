@@ -1,16 +1,17 @@
 'use client';
 
 import { db } from '../utils/firebase';
-import { 
-  collection, 
-  doc, 
-  setDoc, 
-  getDoc, 
-  updateDoc, 
-  deleteDoc, 
+import {
+  collection,
+  doc,
+  setDoc,
+  getDoc,
+  updateDoc,
+  deleteDoc,
   onSnapshot
 } from 'firebase/firestore';
 import { inventoryService } from './inventoryService';
+import { jerseySizeLabel, isValidJerseySizeCode, type JerseySizeCode } from '../constants/jersey';
 
 // Reactivo interno del CartService
 type Listener = (items: CartItem[]) => void;
@@ -21,8 +22,10 @@ export interface CartItem {
   price: number;
   image: string;
   quantity: number;
-  size?: string;
-  color?: string;
+  sizeCode?: JerseySizeCode;
+  sizeLabel?: string;
+  versionId?: string;
+  versionLabel?: string;
   userId?: string;
   dateAdded?: string;
 }
@@ -41,6 +44,33 @@ class CartService {
 
   // Estado reactivo interno
   private listeners: Listener[] = [];
+
+  private sanitizeSizeCode(sizeCode?: string | JerseySizeCode): JerseySizeCode | undefined {
+    if (!sizeCode) return undefined;
+    const candidate = typeof sizeCode === 'string' ? sizeCode.trim().toUpperCase() : sizeCode;
+    return isValidJerseySizeCode(candidate) ? (candidate as JerseySizeCode) : undefined;
+  }
+
+  private enrichCartItem(item: CartItem): CartItem {
+    const sizeCode = this.sanitizeSizeCode(item.sizeCode);
+    return {
+      ...item,
+      sizeCode,
+      sizeLabel: sizeCode ? jerseySizeLabel(sizeCode) : item.sizeLabel,
+    };
+  }
+
+  private normalizeItems(items: CartItem[]): CartItem[] {
+    return items.map((item) => this.enrichCartItem(item));
+  }
+
+  private findItemIndex(items: CartItem[], id: number, sizeCode?: JerseySizeCode, versionId?: string): number {
+    return items.findIndex((item) =>
+      item.id === id &&
+      (item.sizeCode || undefined) === (sizeCode || undefined) &&
+      (item.versionId || undefined) === (versionId || undefined)
+    );
+  }
 
   /* ================================================================
       🔹 LISTENER SYSTEM REACTIVO
@@ -77,26 +107,38 @@ class CartService {
 
   private emit(items?: CartItem[]) {
     if (items) {
-      this.listeners.forEach(cb => cb(items));
-    } else {
-      // Si no hay items → modo invitado
-      const guest = this.getGuestCart();
-      this.listeners.forEach(cb => cb(guest));
+      const normalized = this.normalizeItems(items);
+      this.listeners.forEach(cb => cb(normalized));
+      return;
     }
+
+    // Si no se proporciona lista → modo invitado
+    const guest = this.getGuestCart();
+    this.listeners.forEach(cb => cb(guest));
   }
 
   /* ================================================================
       🔹 CARRITO INVITADO
   =================================================================*/
   private getGuestCart(): CartItem[] {
-    return JSON.parse(localStorage.getItem(this.CART_GUEST_KEY) || '[]');
+    if (typeof window === 'undefined') return [];
+    try {
+      const raw = JSON.parse(localStorage.getItem(this.CART_GUEST_KEY) || '[]');
+      return Array.isArray(raw) ? this.normalizeItems(raw as CartItem[]) : [];
+    } catch (error) {
+      console.warn('No se pudo leer el carrito de invitados, se reiniciará.', error);
+      return [];
+    }
   }
 
   private saveGuestCart(items: CartItem[]) {
-    localStorage.setItem(this.CART_GUEST_KEY, JSON.stringify(items));
+    if (typeof window === 'undefined') return;
+
+    const normalized = this.normalizeItems(items);
+    localStorage.setItem(this.CART_GUEST_KEY, JSON.stringify(normalized));
 
     // Emitir cambios al sistema reactivo
-    this.emit(items);
+    this.emit(normalized);
 
     // Evento global (para actualizar el ícono)
     window.dispatchEvent(new Event("cart-updated"));
@@ -113,7 +155,10 @@ class CartService {
     try {
       const cartRef = doc(db, this.COLLECTION_NAME, userId);
       const cartDoc = await getDoc(cartRef);
-      if (cartDoc.exists()) return (cartDoc.data() as CartData).items || [];
+      if (cartDoc.exists()) {
+        const storedItems = (cartDoc.data() as CartData).items || [];
+        return this.normalizeItems(storedItems);
+      }
       return [];
 
     } catch (error) {
@@ -138,19 +183,37 @@ class CartService {
     ====================================== */
     if (!userId) {
       const guestItems = this.getGuestCart();
-      const index = guestItems.findIndex(i => i.id === item.id);
+      const sizeCode = this.sanitizeSizeCode(item.sizeCode);
+      const versionId = item.versionId || undefined;
+
+      const isAvailable = await inventoryService.isProductAvailable(item.id, item.quantity, sizeCode, versionId);
+      if (!isAvailable) {
+        const stock = await inventoryService.getProductStock(item.id, sizeCode, versionId);
+        throw new Error(`No hay suficiente stock para la talla seleccionada. Stock disponible: ${stock}`);
+      }
+
+      const index = this.findItemIndex(guestItems, item.id, sizeCode, versionId);
 
       if (index !== -1) {
-        guestItems[index].quantity += item.quantity;
+        const newQuantity = guestItems[index].quantity + item.quantity;
+        const available = await inventoryService.isProductAvailable(item.id, newQuantity, sizeCode, versionId);
+        if (!available) {
+          const stock = await inventoryService.getProductStock(item.id, sizeCode, versionId);
+          throw new Error(`Cantidad supera stock disponible para la talla seleccionada. Stock actual: ${stock}`);
+        }
+
+        guestItems[index].quantity = newQuantity;
       } else {
         guestItems.push({
           ...item,
+          sizeCode,
+          sizeLabel: sizeCode ? jerseySizeLabel(sizeCode) : item.sizeLabel,
+          versionId,
           dateAdded: new Date().toISOString()
         });
       }
 
       this.saveGuestCart(guestItems);
-
 
       return true;
     }
@@ -162,15 +225,20 @@ class CartService {
           🟢 MODO LOGUEADO (Firebase)
     ====================================== */
     try {
+      const sizeCode = this.sanitizeSizeCode(item.sizeCode);
+      const versionId = item.versionId || undefined;
+
       // 🛑 Validar stock del inventario
       const isAvailable = await inventoryService.isProductAvailable(
         item.id,
-        item.quantity
+        item.quantity,
+        sizeCode,
+        versionId
       );
 
       if (!isAvailable) {
-        const stock = await inventoryService.getProductStock(item.id);
-        throw new Error(`No hay suficiente stock. Stock disponible: ${stock}`);
+        const stock = await inventoryService.getProductStock(item.id, sizeCode, versionId);
+        throw new Error(`No hay suficiente stock disponible para la talla seleccionada. Stock disponible: ${stock}`);
       }
 
       const cartRef = doc(db, this.COLLECTION_NAME, userId);
@@ -178,19 +246,19 @@ class CartService {
 
       let items: CartItem[] = [];
       if (cartDoc.exists()) {
-        items = (cartDoc.data() as CartData).items || [];
+        items = this.normalizeItems((cartDoc.data() as CartData).items || []);
       }
 
-      const index = items.findIndex(i => i.id === item.id);
+      const index = this.findItemIndex(items, item.id, sizeCode, versionId);
 
       if (index !== -1) {
         // sumar cantidad
         const newQuantity = items[index].quantity + item.quantity;
 
-        const available = await inventoryService.isProductAvailable(item.id, newQuantity);
+        const available = await inventoryService.isProductAvailable(item.id, newQuantity, sizeCode, versionId);
         if (!available) {
-          const stock = await inventoryService.getProductStock(item.id);
-          throw new Error(`Cantidad supera stock. Stock actual: ${stock}`);
+          const stock = await inventoryService.getProductStock(item.id, sizeCode, versionId);
+          throw new Error(`Cantidad supera stock disponible para la talla seleccionada. Stock actual: ${stock}`);
         }
 
         items[index].quantity += item.quantity;
@@ -198,6 +266,9 @@ class CartService {
       } else {
         items.push({
           ...item,
+          sizeCode,
+          sizeLabel: sizeCode ? jerseySizeLabel(sizeCode) : item.sizeLabel,
+          versionId,
           userId,
           dateAdded: new Date().toISOString()
         });
@@ -208,7 +279,7 @@ class CartService {
 
       const newCart: CartData = {
         userId,
-        items,
+        items: this.normalizeItems(items),
         totalItems,
         totalPrice,
         lastUpdated: new Date().toISOString()
@@ -217,7 +288,7 @@ class CartService {
       await setDoc(cartRef, newCart);
 
       // 🔥 emitir actualización a los listeners del cartService
-      this.emit(items);
+      this.emit(newCart.items);
 
       // 🔥 notificación global (carrito actualizado en otras páginas)
       window.dispatchEvent(new Event("cart-updated"));
@@ -269,12 +340,19 @@ class CartService {
   /* ================================================================
       🔹 UPDATE QUANTITY
   =================================================================*/
-  async updateCartItemQuantity(userId: string, itemId: number, qty: number): Promise<boolean> {
+  async updateCartItemQuantity(
+    userId: string,
+    itemId: number,
+    qty: number,
+    sizeCodeInput?: JerseySizeCode,
+    versionId?: string
+  ): Promise<boolean> {
+    const sizeCode = this.sanitizeSizeCode(sizeCodeInput);
 
     /* Invitado */
     if (!userId) {
       const items = this.getGuestCart();
-      const index = items.findIndex(i => i.id === itemId);
+      const index = this.findItemIndex(items, itemId, sizeCode, versionId);
 
       if (index === -1) return false;
 
@@ -287,10 +365,10 @@ class CartService {
 
     /* Logueado */
     try {
-      const available = await inventoryService.isProductAvailable(itemId, qty);
+      const available = await inventoryService.isProductAvailable(itemId, qty, sizeCode, versionId);
       if (!available) {
-        const stock = await inventoryService.getProductStock(itemId);
-        throw new Error(`Stock insuficiente. Disponible: ${stock}`);
+        const stock = await inventoryService.getProductStock(itemId, sizeCode, versionId);
+        throw new Error(`Stock insuficiente para la talla seleccionada. Disponible: ${stock}`);
       }
 
       const cartRef = doc(db, this.COLLECTION_NAME, userId);
@@ -298,9 +376,9 @@ class CartService {
       if (!cartDoc.exists()) return false;
 
       const cartData = cartDoc.data() as CartData;
-      const items = cartData.items;
+      const items = this.normalizeItems(cartData.items);
 
-      const index = items.findIndex(i => i.id === itemId);
+      const index = this.findItemIndex(items, itemId, sizeCode, versionId);
       if (index === -1) return false;
 
       if (qty <= 0) items.splice(index, 1);
@@ -311,7 +389,7 @@ class CartService {
 
       await setDoc(cartRef, {
         ...cartData,
-        items,
+        items: this.normalizeItems(items),
         totalItems,
         totalPrice,
         lastUpdated: new Date().toISOString()
@@ -330,11 +408,23 @@ class CartService {
   /* ================================================================
       🔹 REMOVE ITEM
   =================================================================*/
-  async removeFromCart(userId: string, itemId: number): Promise<boolean> {
+  async removeFromCart(
+    userId: string,
+    itemId: number,
+    sizeCodeInput?: JerseySizeCode,
+    versionId?: string
+  ): Promise<boolean> {
+    const sizeCode = this.sanitizeSizeCode(sizeCodeInput);
 
     /* Invitado */
     if (!userId) {
-      const items = this.getGuestCart().filter(i => i.id !== itemId);
+      const items = this.getGuestCart().filter(
+        (i) => !(
+          i.id === itemId &&
+          (i.sizeCode || undefined) === (sizeCode || undefined) &&
+          (i.versionId || undefined) === (versionId || undefined)
+        )
+      );
       this.saveGuestCart(items);
       return true;
     }
@@ -346,14 +436,20 @@ class CartService {
       if (!cartDoc.exists()) return false;
 
       const cartData = cartDoc.data() as CartData;
-      const items = cartData.items.filter(i => i.id !== itemId);
+      const items = this.normalizeItems(cartData.items).filter(
+        (i) => !(
+          i.id === itemId &&
+          (i.sizeCode || undefined) === (sizeCode || undefined) &&
+          (i.versionId || undefined) === (versionId || undefined)
+        )
+      );
 
       const totalItems = items.reduce((a, b) => a + b.quantity, 0);
       const totalPrice = items.reduce((a, b) => a + b.quantity * b.price, 0);
 
       await setDoc(cartRef, {
         ...cartData,
-        items,
+        items: this.normalizeItems(items),
         totalItems,
         totalPrice,
         lastUpdated: new Date().toISOString()
@@ -381,11 +477,13 @@ class CartService {
       const guest = this.getGuestCart();
       if (guest.length === 0) return false;
 
-      const merged = guest.map(i => ({
-        ...i,
-        userId,
-        dateAdded: new Date().toISOString()
-      }));
+      const merged = this.normalizeItems(
+        guest.map(i => ({
+          ...i,
+          userId,
+          dateAdded: new Date().toISOString()
+        }))
+      );
 
       const totalItems = merged.reduce((a, b) => a + b.quantity, 0);
       const totalPrice = merged.reduce((a, b) => a + b.quantity * b.price, 0);

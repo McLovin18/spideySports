@@ -3,12 +3,30 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import Image from 'next/image';
 import { useAuth } from '../context/AuthContext';
 import { Navbar, Nav, Container, NavDropdown } from 'react-bootstrap';
 import { cartService } from '../services/cartService';
 import { SUBCATEGORIES, CATEGORIES } from '../constants/categories';
 import UserNotificationBell from './UserNotificationBell';
+
+const CATEGORY_VISUALS: Record<string, { icon: string; tagline: string }> = {
+  clubKits: {
+    icon: 'bi-shield-fill',
+    tagline: 'Club kits élite',
+  },
+  nationalTeams: {
+    icon: 'bi-flag-fill',
+    tagline: 'Orgullo nacional',
+  },
+  specialEditions: {
+    icon: 'bi-stars',
+    tagline: 'Drops exclusivos',
+  },
+  retroClassics: {
+    icon: 'bi-rewind-fill',
+    tagline: 'Clásicos eternos',
+  },
+};
 
 const NavbarComponent = () => {
   const { user, logout } = useAuth();
@@ -21,58 +39,45 @@ const NavbarComponent = () => {
   const navRef = useRef<HTMLDivElement | null>(null);
   const [dropdownAlignment, setDropdownAlignment] = useState<Record<string, 'start' | 'end'>>({});
 
-
   // 🔥 Hook para actualizar altura SOLO del navbar (sin el contenido expandido)
-    useEffect(() => {
-      if (!activeDropdown) return; // Solo ejecutar si hay un menú abierto
+  useEffect(() => {
+    if (!activeDropdown) return; // Solo ejecutar si hay un menú abierto
 
-      const handlePosition = () => {
-        // Evitar la ejecución en móvil
-        if (window.innerWidth < 992) return; 
+    const handlePosition = () => {
+      if (window.innerWidth < 992) return;
 
-        // 1. Buscamos el elemento del botón de la categoría
-        const dropdownButton = document.getElementById(`nav-dropdown-${activeDropdown}`);
-        if (!dropdownButton) return;
+      const dropdownButton = document.getElementById(`nav-dropdown-${activeDropdown}`);
+      if (!dropdownButton) return;
 
-        // 2. Usamos el botón del dropdown para calcular si está cerca del borde
-        const rect = dropdownButton.getBoundingClientRect();
-        const screenWidth = window.innerWidth;
-        
-        // ✅ UMERAL: Distancia en píxeles desde el borde derecho para que se considere "cerca".
-        // Si el botón está a menos de 400px del borde derecho, expandimos a la izquierda.
-        // Puedes ajustar este valor (400) según el ancho de tu menú desplegable.
-        const threshold = 600; 
-        
-        let newAlignment: 'start' | 'end' = 'start'; // 'start' es el valor por defecto
+      const rect = dropdownButton.getBoundingClientRect();
+      const screenWidth = window.innerWidth;
+      const threshold = 600;
 
-        // Si el borde derecho del botón está más allá del límite de seguridad (pantalla - umbral)
-        if (rect.right > screenWidth - threshold) {
-            newAlignment = 'end'; // Usar 'end' para forzar la expansión hacia la izquierda
+      let newAlignment: 'start' | 'end' = 'start';
+
+      if (rect.right > screenWidth - threshold) {
+        newAlignment = 'end';
+      }
+
+      setDropdownAlignment(prev => {
+        if (prev[activeDropdown] !== newAlignment) {
+          return {
+            ...prev,
+            [activeDropdown]: newAlignment,
+          };
         }
-        
-        // Solo actualiza el estado si el alineamiento realmente cambió
-        setDropdownAlignment(prev => {
-          if (prev[activeDropdown] !== newAlignment) {
-              return {
-                  ...prev,
-                  [activeDropdown]: newAlignment
-              };
-          }
-          return prev;
-        });
-      };
+        return prev;
+      });
+    };
 
-      // Ejecutar la corrección justo después de que el dropdown se muestre (asíncrono)
-      const timeoutId = setTimeout(handlePosition, 0); 
+    const timeoutId = setTimeout(handlePosition, 0);
+    window.addEventListener('resize', handlePosition);
 
-      // Recalcular en resize si el menú está abierto
-      window.addEventListener('resize', handlePosition);
-
-      return () => {
-        clearTimeout(timeoutId);
-        window.removeEventListener('resize', handlePosition);
-      };
-    }, [activeDropdown]); // Se ejecuta cada vez que cambia el dropdown activo
+    return () => {
+      clearTimeout(timeoutId);
+      window.removeEventListener('resize', handlePosition);
+    };
+  }, [activeDropdown]);
 
 
 
@@ -153,11 +158,13 @@ const NavbarComponent = () => {
       >
         <Container className="navbar-container">
           {/* fila 1 - logo arriba, menú alineado y acciones móviles debajo */}
-          <div className="first-row d-flex flex-column flex-lg-row w-100 px-3 py-1">
+          <div className="first-row d-flex flex-column flex-lg-row w-100 px-3 py-1 ">
             {/* Subfila superior: logo + botón de menú (móvil) */}
             <div className="d-flex justify-content-between align-items-center w-100">
-              <Navbar.Brand as={Link} href="/" className="me-auto">
-                <img className='logo_img' style={{ maxWidth: "280px", height: "auto" }} src="/logo.png" alt="Logo" />
+              <Navbar.Brand as={Link} href="/" className="me-auto spidey-logo-brand" aria-label="Inicio SpideySports">
+                <span className="spidey-logo-wrapper">
+                  <img className="spidey-logo" src="/logoWeb.png" alt="Logo SpideySports" />
+                </span>
               </Navbar.Brand>
 
               <Navbar.Toggle
@@ -204,10 +211,11 @@ const NavbarComponent = () => {
           </div>
 
           {/* Fila 2 - CATEGORÍAS (Desktop) */}
-          <div className="second-row d-none d-lg-flex flex-wrap justify-content-center w-100 px-3 pb-2">
-            <Nav className="flex-wrap justify-content-center">
+          <div className="second-row main-menu-row d-none d-lg-flex flex-wrap justify-content-center w-100 px-3 pb-2">
+            <Nav className="flex-wrap justify-content-center main-menu-nav">
               {CATEGORIES.map(cat => {
                 const isOpen = activeDropdown === cat.id;
+                const visuals = CATEGORY_VISUALS[cat.id];
 
                 // ✅ Lógica: Si la categoría está en nuestra lista de "problemas de borde derecho",
                 // la forzamos a alinearse al 'end' (que hace que se expanda a la izquierda).
@@ -216,12 +224,24 @@ const NavbarComponent = () => {
                 return (
                   <NavDropdown
                     key={cat.id}
-                    title={<span className="d-flex align-items-center gap-1">{cat.label}</span>}
+                    title={(
+                      <span className="main-menu-link">
+                        <span className="menu-icon-wrapper">
+                          <i className={`bi ${visuals?.icon ?? 'bi-hexagon-fill'} menu-icon`} aria-hidden="true" />
+                        </span>
+                        <span className="menu-text">
+                          <span className="menu-label">{cat.label}</span>
+                          {visuals?.tagline && (
+                            <small className="menu-tagline">{visuals.tagline}</small>
+                          )}
+                        </span>
+                      </span>
+                    )}
                     id={`nav-dropdown-${cat.id}`}
                     show={isOpen}
                     onMouseEnter={() => setActiveDropdown(cat.id)}
                     onMouseLeave={() => setActiveDropdown(prev => (prev === cat.id ? null : prev))}
-                    className="mx-2 my-1"
+                    className="mx-2 my-1 main-menu-item"
                     // ✅ APLICAMOS el alineamiento forzado
                     align={alignment}
                   >
@@ -263,6 +283,7 @@ const NavbarComponent = () => {
                 <Nav className="flex-column text-start px-3 py-3">
                   {CATEGORIES.map(cat => {
                     const isOpen = activeDropdown === cat.id;
+                    const visuals = CATEGORY_VISUALS[cat.id];
                     return (
                       <div key={cat.id} className="mb-3 w-100">
                         {/* título categoría */}
@@ -273,13 +294,18 @@ const NavbarComponent = () => {
                           aria-expanded={isOpen}
                           aria-controls={`mobile-cat-${cat.id}`}
                           style={{ 
-                            fontSize: "1.1rem",
-                            cursor: "pointer",
-                            fontWeight: isOpen ? '600' : '500',
-                            color: 'var(--cosmetic-tertiary)'
+                            fontWeight: isOpen ? 650 : 500
                           }}
                         >
-                          {cat.label}
+                          <span className="d-flex flex-column flex-sm-row align-items-start align-items-sm-center gap-1 menu-button-text">
+                            <span className="d-flex align-items-center gap-2">
+                              <i className={`bi ${visuals?.icon ?? 'bi-hexagon-fill'} menu-icon`} aria-hidden="true" />
+                              <span className="text-start">{cat.label}</span>
+                            </span>
+                            {visuals?.tagline && (
+                              <small className="menu-tagline text-start ms-sm-1">{visuals.tagline}</small>
+                            )}
+                          </span>
                           <span aria-hidden style={{ 
                             transition: 'transform 0.2s',
                             transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
@@ -304,13 +330,6 @@ const NavbarComponent = () => {
                               onClick={(e) => handleSubcategoryClick(cat.id, sub.value, e)}
                               className="nav-subcategory d-block py-2 px-2"
                               role="link"
-                              style={{
-                                color: 'var(--cosmetic-tertiary)',
-                                textDecoration: 'none',
-                                transition: 'all 0.2s',
-                                fontSize: '0.95rem',
-                                borderRadius: '0.5rem'
-                              }}
                             >
                               {sub.label}
                             </a>
@@ -326,7 +345,7 @@ const NavbarComponent = () => {
               <div 
                 className="mobile-menu-actions border-top px-3 py-3 bg-cosmetic-secondary"
                 style={{ 
-                  borderColor: 'rgba(140, 156, 132, 0.2) !important',
+                  borderColor: 'rgba(3, 123, 144, 0.25) !important',
                   flexShrink: 0
                 }}
               >

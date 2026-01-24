@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect , useCallback } from 'react';
+import React, { useState, useEffect , useCallback, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -14,47 +14,54 @@ import allProducts from '../productsData';
 import FavouriteButton from '../../components/FavouriteButton';
 import Footer from "../../components/Footer";
 import { recommendationEngine, type Product } from '../../services/recommendationService';
-import { cartService } from '../../services/cartService';
-import { inventoryService, type ProductInventory } from '../../services/inventoryService';
+import { cartService, type CartItem } from '../../services/cartService';
+import { inventoryService, type ProductInventory, type JerseyVersion, type SizeStock } from '../../services/inventoryService';
 import ProductStockIndicator from '../../components/ProductStockIndicator';
 import { getSeasonalDiscountConfig, type SeasonalDiscountConfig, getProductSeasonalDiscountPercent } from '../../services/seasonalDiscountService';
+import { jerseySizeLabel, type JerseySizeCode } from '../../constants/jersey';
 
 // Función para convertir ProductInventory a Product
 const convertInventoryToProduct = (inventory: ProductInventory): Product => {
   // Mapeo de categorías a sus rutas correspondientes
   const categoryLinkMap: { [key: string]: string } = {
-    'Maquillaje': '/maquillaje',
-    'Cuidado de Piel': '/cuidado-piel',
-    'Fragancias': '/fragancias',
-    'Accesorios': '/accesorios',
-    'Contorno': '/maquillaje',
-    'Máscaras de Pestañas': '/maquillaje',
-    'Delineadores': '/maquillaje',
-    'Labiales': '/maquillaje',
-    'Cremas Hidratantes': '/cuidado-piel',
-    'Serums': '/cuidado-piel',
-    'Limpieza Facial': '/cuidado-piel',
-    'Tónicos': '/cuidado-piel',
-    'Mascarillas Faciales': '/cuidado-piel',
-    'Protección Solar': '/cuidado-piel',
-    'Cuidado Corporal': '/cuidado-piel',
-    'Brochas': '/accesorios',
-    'Cuidado de Uñas': '/accesorios'
+    clubKits: '/categories/liga-espanola',
+    nationalTeams: '/categories/europe',
+    specialEditions: '/categories/limited-edition',
+    retroClassics: '/categories/retro-90s',
+    trainingLifestyle: '/categories/pre-match',
+    goalkeeperKits: '/categories/club-goalkeeper',
+    youthKits: '/categories/kids-clubs'
   };
   
   const categoryLink = categoryLinkMap[inventory.category || ''] || '/productos';
+  const versions: JerseyVersion[] = Array.isArray(inventory.versions) ? inventory.versions : [];
+  const defaultVersionId = inventory.defaultVersionId ?? (versions[0]?.id ?? null);
+  const sizeOptions = Array.isArray(inventory.sizeStocks)
+    ? inventory.sizeStocks.map((size) => ({
+        code: size.code,
+        label: jerseySizeLabel(size.code),
+        quantity: size.quantity ?? 0,
+      }))
+    : [];
+
+  const resolvedImages = Array.isArray(inventory.images) && inventory.images.length > 0
+    ? inventory.images
+    : ['/images/product1.svg'];
   
   return {
     id: inventory.productId,
     name: inventory.name,
     price: inventory.price,
-    images: inventory.images,
+    images: resolvedImages,
     category: inventory.category || 'Sin categoría',
     categoryLink: categoryLink,
     description: inventory.description || '',
     inStock: inventory.stock > 0 && inventory.isActive,
     details: inventory.details || [],
-    featured: false
+    featured: false,
+    versions,
+    defaultVersionId,
+    sizeOptions,
   };
 };
 
@@ -123,6 +130,8 @@ const ProductDetailPage = () => {
   const [loadingProduct, setLoadingProduct] = useState(true);
   const [seasonalConfig, setSeasonalConfig] = useState<SeasonalDiscountConfig | null>(null);
   const [loadingSeasonal, setLoadingSeasonal] = useState(false);
+  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
+  const [selectedSizeCode, setSelectedSizeCode] = useState<JerseySizeCode | null>(null);
 
   const [replyEmojiState, setReplyEmojiState] = useState<{ [key: number]: { button?: boolean; picker?: boolean } }>({});
   const replyEmojiButtonRefs = React.useRef<{ [key: number]: HTMLButtonElement | null }>({});
@@ -166,7 +175,18 @@ const ProductDetailPage = () => {
         foundProduct = allProducts.find(p => p.id === productId);
       }
 
+      if (!foundProduct) {
+        setSelectedVersionId(null);
+        setSelectedSizeCode(null);
+        setProduct(undefined);
+        setLoadingProduct(false);
+        return;
+      }
+
       setProduct(foundProduct);
+      setCurrentImageIndex(0);
+      setSelectedVersionId(null);
+      setSelectedSizeCode(null);
       setLoadingProduct(false);
     };
 
@@ -181,11 +201,87 @@ const ProductDetailPage = () => {
   useEffect(() => {
     const checkStock = async () => {
       if (!product?.id) return;
-      
+
+      const versions: JerseyVersion[] = Array.isArray((product as any).versions)
+        ? (product as any).versions
+        : [];
+
+      if (versions.length > 1 && !selectedVersionId) {
+        setStockAvailable(false);
+        setStockAmount(0);
+        return;
+      }
+
+      const activeVersionId =
+        versions.length === 1
+          ? versions[0].id
+          : (selectedVersionId ?? undefined);
+      const versionRecord = activeVersionId
+        ? versions.find((version) => version.id === activeVersionId)
+        : undefined;
+
+      if (versions.length > 0 && (!activeVersionId || !versionRecord)) {
+        setStockAvailable(false);
+        setStockAmount(0);
+        return;
+      }
+
+      const versionHasSizes = Boolean(
+        versionRecord?.sizeStocks?.some((size) => (size.quantity ?? 0) > 0)
+      );
+
+      const aggregatedSizes = Array.isArray((product as any).sizeOptions)
+        ? (product as any).sizeOptions
+        : [];
+      const productHasSizes = aggregatedSizes.some((size: { quantity?: number }) => (size.quantity ?? 0) > 0);
+
+      if (versionRecord && (versionRecord.availableStock ?? 0) <= 0) {
+        setStockAvailable(false);
+        setStockAmount(0);
+        return;
+      }
+
+      let effectiveSize: JerseySizeCode | undefined;
+
+      if (versionHasSizes) {
+        const availableCodes = versionRecord!.sizeStocks
+          .filter((size) => (size.quantity ?? 0) > 0)
+          .map((size) => size.code as JerseySizeCode);
+
+        if (!selectedSizeCode || !availableCodes.includes(selectedSizeCode)) {
+          setStockAvailable(false);
+          setStockAmount(0);
+          return;
+        }
+
+        effectiveSize = selectedSizeCode;
+      } else if (!versions.length && productHasSizes) {
+        const availableCodes = aggregatedSizes
+          .filter((size: { quantity?: number }) => (size.quantity ?? 0) > 0)
+          .map((size: { code: JerseySizeCode }) => size.code as JerseySizeCode);
+
+        if (!selectedSizeCode || !availableCodes.includes(selectedSizeCode)) {
+          setStockAvailable(false);
+          setStockAmount(0);
+          return;
+        }
+
+        effectiveSize = selectedSizeCode;
+      }
+
       try {
-        const stock = await inventoryService.getProductStock(product.id);
-        const isAvailable = await inventoryService.isProductAvailable(product.id, quantity);
-        
+        const stock = await inventoryService.getProductStock(
+          product.id,
+          effectiveSize,
+          activeVersionId ?? undefined
+        );
+        const isAvailable = await inventoryService.isProductAvailable(
+          product.id,
+          quantity,
+          effectiveSize,
+          activeVersionId ?? undefined
+        );
+
         setStockAmount(stock);
         setStockAvailable(isAvailable && stock > 0);
       } catch (error) {
@@ -195,11 +291,230 @@ const ProductDetailPage = () => {
       }
     };
 
-    // Usar un timeout para evitar verificaciones excesivas
     const timeoutId = setTimeout(checkStock, 300);
-    
     return () => clearTimeout(timeoutId);
-  }, [product?.id, quantity]);
+  }, [product, quantity, selectedVersionId, selectedSizeCode]);
+
+  useEffect(() => {
+    if (!product) {
+      return;
+    }
+
+    if (!product) {
+      if (selectedSizeCode !== null) {
+        setSelectedSizeCode(null);
+      }
+      return;
+    }
+
+    const versions: JerseyVersion[] = Array.isArray((product as any).versions)
+      ? (product as any).versions
+      : [];
+
+    if (versions.length > 0) {
+      if (!selectedVersionId) {
+        if (selectedSizeCode !== null) {
+          setSelectedSizeCode(null);
+        }
+        return;
+      }
+
+      const versionRecord = versions.find((version) => version.id === selectedVersionId);
+      if (!versionRecord) {
+        if (selectedSizeCode !== null) {
+          setSelectedSizeCode(null);
+        }
+        return;
+      }
+
+      const availableCodes = versionRecord.sizeStocks
+        ?.filter((size) => (size.quantity ?? 0) > 0)
+        .map((size) => size.code as JerseySizeCode) ?? [];
+
+      if (availableCodes.length === 0) {
+        if (selectedSizeCode !== null) {
+          setSelectedSizeCode(null);
+        }
+        return;
+      }
+
+      if (!selectedSizeCode) {
+        return;
+      }
+
+      if (!availableCodes.includes(selectedSizeCode)) {
+        setSelectedSizeCode(null);
+      }
+      return;
+    }
+
+    const aggregatedSizes = Array.isArray((product as any).sizeOptions)
+      ? (product as any).sizeOptions
+      : [];
+
+    const availableAggregatedCodes = aggregatedSizes
+      .filter((size: { quantity?: number }) => (size.quantity ?? 0) > 0)
+      .map((size: { code: JerseySizeCode }) => size.code as JerseySizeCode);
+
+    if (availableAggregatedCodes.length === 0) {
+      if (selectedSizeCode !== null) {
+        setSelectedSizeCode(null);
+      }
+      return;
+    }
+
+    if (!selectedSizeCode) {
+      return;
+    }
+
+    if (!availableAggregatedCodes.includes(selectedSizeCode)) {
+      setSelectedSizeCode(null);
+    }
+  }, [product, selectedVersionId, selectedSizeCode]);
+
+  const versions: JerseyVersion[] = useMemo(() => (
+    product && Array.isArray((product as any).versions)
+      ? ((product as any).versions as JerseyVersion[])
+      : []
+  ), [product]);
+
+  const currentVersion = useMemo(() => {
+    if (!versions.length || !selectedVersionId) return undefined;
+    return versions.find((version) => version.id === selectedVersionId);
+  }, [versions, selectedVersionId]);
+
+  const productImages = useMemo(() => (product?.images ?? []), [product]);
+
+  const availableSizes = useMemo(() => {
+    if (versions.length > 0) {
+      if (!currentVersion) {
+        return [] as Array<{ code: JerseySizeCode; label: string; quantity: number }>;
+      }
+
+      return (currentVersion.sizeStocks || [])
+        .filter((size) => (size.quantity ?? 0) > 0)
+        .map((size) => ({
+          code: size.code as JerseySizeCode,
+          label: jerseySizeLabel(size.code as JerseySizeCode),
+          quantity: size.quantity ?? 0,
+        }));
+    }
+
+    if (product && Array.isArray((product as any).sizeOptions)) {
+      return ((product as any).sizeOptions as Array<{ code: JerseySizeCode; label?: string; quantity?: number }>)
+        .filter((size) => (size.quantity ?? 0) > 0)
+        .map((size) => ({
+          code: size.code as JerseySizeCode,
+          label: size.label || jerseySizeLabel(size.code as JerseySizeCode),
+          quantity: size.quantity ?? 0,
+        }));
+    }
+
+    return [] as Array<{ code: JerseySizeCode; label: string; quantity: number }>;
+  }, [versions, currentVersion, product]);
+
+  const versionOptions = useMemo(
+    () =>
+      versions.map((version) => ({
+        version,
+        isAvailable: (version.availableStock ?? 0) > 0 && (version.isActive ?? true),
+      })),
+    [versions]
+  );
+
+  const hasAvailableVersions = versionOptions.some((option) => option.isAvailable);
+
+  const sizeSelectionRequired = availableSizes.length > 0;
+  const versionSelectionRequired = versions.length > 1;
+  const shouldRenderSizeBlock = sizeSelectionRequired && (!versionSelectionRequired || !!selectedVersionId);
+  const selectionComplete = (!versionSelectionRequired || !!selectedVersionId) && (!sizeSelectionRequired || !!selectedSizeCode);
+  const disableAddToCart = !selectionComplete || !stockAvailable;
+
+  useEffect(() => {
+    if (!currentVersion?.imageUrl) return;
+    const index = productImages.findIndex((img) => img === currentVersion.imageUrl);
+    if (index >= 0 && index !== currentImageIndex) {
+      setCurrentImageIndex(index);
+    }
+  }, [currentVersion, productImages, currentImageIndex]);
+
+  const handleVersionSelect = useCallback((versionId: string) => {
+    setSelectedVersionId((prev) => {
+      if (prev !== versionId) {
+        setSelectedSizeCode(null);
+      }
+      return versionId;
+    });
+    const candidate = versions.find((version) => version.id === versionId);
+    if (!candidate?.imageUrl) {
+      return;
+    }
+
+    const index = productImages.findIndex((img) => img === candidate.imageUrl);
+    if (index >= 0) {
+      setCurrentImageIndex(index);
+    }
+  }, [versions, productImages]);
+
+  useEffect(() => {
+    if (versions.length === 1) {
+      const soleVersion = versions[0];
+      if (selectedVersionId !== soleVersion.id) {
+        handleVersionSelect(soleVersion.id);
+      }
+    }
+  }, [versions, selectedVersionId, handleVersionSelect]);
+
+  const handleSizeSelect = useCallback((sizeCode: JerseySizeCode) => {
+    setSelectedSizeCode(sizeCode);
+  }, [setSelectedSizeCode]);
+
+  const renderAddToCartContent = useCallback(() => {
+    if (!selectionComplete) {
+      if (sizeSelectionRequired && !selectedSizeCode) {
+        return (
+          <>
+            <i className="bi bi-arrow-down-circle me-2"></i>
+            Selecciona tu talla
+          </>
+        );
+      }
+
+      if (versionSelectionRequired && !selectedVersionId) {
+        return (
+          <>
+            <i className="bi bi-arrow-down-circle me-2"></i>
+            Selecciona versión
+          </>
+        );
+      }
+    }
+
+    if (!stockAvailable) {
+      if (stockAmount === 0) {
+        return (
+          <>
+            <i className="bi bi-x-circle me-2"></i>
+            Sin stock
+          </>
+        );
+      }
+
+      return (
+        <>
+          <i className="bi bi-exclamation-triangle me-2"></i>
+          Stock insuficiente
+        </>
+      );
+    }
+
+    return (
+      <>
+        <i className="bi bi-cart-plus me-2"></i>
+        Añadir al carrito
+      </>
+    );
+  }, [selectionComplete, sizeSelectionRequired, selectedSizeCode, versionSelectionRequired, selectedVersionId, stockAvailable, stockAmount]);
 
 
   // Cerrar el emoji picker solo si se hace clic fuera del input, botón y picker
@@ -610,57 +925,42 @@ const ProductDetailPage = () => {
       return;
     }
 
+    if (versionSelectionRequired && (!selectedVersionId || !currentVersion)) {
+      setErrorMessage('Selecciona una versión disponible.');
+      return;
+    }
+
+    if (sizeSelectionRequired && !selectedSizeCode) {
+      setErrorMessage('Selecciona una talla disponible.');
+      return;
+    }
+
     if (!stockAvailable) {
       setErrorMessage(`Solo hay ${stockAmount} unidades disponibles`);
       return;
     }
 
     const effectivePrice = discountInfo?.discountedPrice ?? product.price;
+    const cartVersion = currentVersion || (selectedVersionId ? versions.find((version) => version.id === selectedVersionId) : undefined);
+    const versionIdForCart = cartVersion?.id;
+    const sizeCodeForCart = sizeSelectionRequired ? selectedSizeCode ?? undefined : undefined;
+    const cartImage = cartVersion?.imageUrl?.trim()
+      ? cartVersion.imageUrl
+      : product.images?.[0] || "/images/product1.svg";
 
-    const cartItem = {
+    const cartItem: Omit<CartItem, 'userId' | 'dateAdded'> = {
       id: product.id,
       name: product.name,
       price: effectivePrice,
-      image: product.images?.[0] || "/images/product1.svg",
+      image: cartImage,
       quantity,
+      versionId: versionIdForCart,
+      versionLabel: cartVersion?.label,
+      sizeCode: sizeCodeForCart,
     };
 
-    /* -------------------------------------------------
-        🟦 MODO INVITADO
-      ------------------------------------------------- */
-    if (!user?.uid) {
-      const GUEST_KEY = "cartItems_guest"; // 🔥 UNIFICADO
-      const existing = JSON.parse(localStorage.getItem(GUEST_KEY) || "[]");
-
-      const index = existing.findIndex((item: any) => item.id === product.id);
-
-      if (index >= 0) {
-        const newQty = existing[index].quantity + quantity;
-        if (newQty > stockAmount) {
-          setErrorMessage(`Solo hay ${stockAmount} unidades disponibles`);
-          return;
-        }
-        existing[index].quantity = newQty;
-      } else {
-        existing.push(cartItem);
-      }
-
-      localStorage.setItem(GUEST_KEY, JSON.stringify(existing));
-
-      // 🔥 MANDAR EVENTO PARA ACTUALIZAR LA CART PAGE
-      window.dispatchEvent(new Event("cart-updated"));
-
-      setAddSuccess(true);
-      setTimeout(() => setAddSuccess(false), 3000);
-      setQuantity(1);
-      return;
-    }
-
-    /* -------------------------------------------------
-        🟩 MODO LOGUEADO
-      ------------------------------------------------- */
     try {
-      await cartService.addToCart(user.uid, cartItem);
+      await cartService.addToCart(user?.uid || '', cartItem);
       setAddSuccess(true);
       setTimeout(() => setAddSuccess(false), 3000);
       setQuantity(1);
@@ -775,8 +1075,7 @@ const ProductDetailPage = () => {
               <Button 
                 as={Link} 
                 href="/products" 
-                className="btn-cosmetic-primary" 
-                className="rounded-pill px-4"
+                className="btn-cosmetic-primary rounded-pill px-4"
               >
                 Ver todos los productos
               </Button>
@@ -897,6 +1196,55 @@ const ProductDetailPage = () => {
                   )}
                 </div>
               </Card>
+              {versionSelectionRequired && (
+                <div className="mt-4">
+                  <h6 className="fw-semibold mb-2">Selecciona la versión</h6>
+                  <div className="d-flex flex-wrap gap-2">
+                    {versionOptions.map(({ version, isAvailable }) => {
+                      const isSelected = selectedVersionId === version.id;
+                      return (
+                        <button
+                          key={version.id}
+                          type="button"
+                          className="btn rounded-1 px-3 py-2 text-start"
+                          style={{
+                            backgroundColor: isSelected ? 'var(--cosmetic-primary)' : '#fff',
+                            color: isSelected ? '#fff' : '#212529',
+                            border: `1px solid ${isSelected ? 'var(--cosmetic-primary)' : '#d1d5db'}`,
+                            opacity: isAvailable ? 1 : 0.55,
+                            cursor: isAvailable ? 'pointer' : 'not-allowed',
+                            boxShadow: isSelected ? '0 6px 12px rgba(0,0,0,0.14)' : '0 2px 6px rgba(0,0,0,0.05)',
+                            transition: 'all 0.18s ease-in-out',
+                            minWidth: '140px'
+                          }}
+                          onClick={() => {
+                            if (isAvailable) {
+                              handleVersionSelect(version.id);
+                            }
+                          }}
+                          disabled={!isAvailable}
+                          aria-pressed={isSelected}
+                        >
+                          <span className="fw-semibold d-block">{version.label || 'Versión'}</span>
+                          <small className="text-muted">
+                            {isAvailable ? `${version.availableStock ?? 0} en stock` : 'Agotada'}
+                          </small>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {hasAvailableVersions && !selectedVersionId && (
+                    <div className="text-muted small mt-2">
+                      Selecciona una versión para ver tallas disponibles.
+                    </div>
+                  )}
+                  {!hasAvailableVersions && (
+                    <div className="text-muted small mt-2">
+                      No hay versiones con stock disponible en este momento.
+                    </div>
+                  )}
+                </div>
+              )}
             </Col>
             <Col xs={12} md={6}>
               <h2 className="fw-bold mb-3">{product.name}</h2>
@@ -925,6 +1273,43 @@ const ProductDetailPage = () => {
                 <ProductStockIndicator productId={product.id} />
               </div>
               <div className="mb-4">{product.description}</div>
+              {shouldRenderSizeBlock && (
+                <div className="mb-4">
+                  <h6 className="fw-semibold mb-2">Selecciona tu talla</h6>
+                  <div className="d-flex flex-wrap gap-2">
+                    {availableSizes.map((size) => {
+                      const isSelected = selectedSizeCode === size.code;
+                      return (
+                        <button
+                          key={size.code}
+                          type="button"
+                          className="btn rounded-1 px-3 py-2 text-start"
+                          style={{
+                            backgroundColor: isSelected ? 'var(--cosmetic-primary)' : '#fff',
+                            color: isSelected ? '#fff' : '#212529',
+                            border: `1px solid ${isSelected ? 'var(--cosmetic-primary)' : '#d1d5db'}`,
+                            boxShadow: isSelected ? '0 6px 12px rgba(0,0,0,0.14)' : '0 2px 6px rgba(0,0,0,0.05)',
+                            transition: 'all 0.18s ease-in-out',
+                            minWidth: '110px'
+                          }}
+                          onClick={() => handleSizeSelect(size.code)}
+                          aria-pressed={isSelected}
+                        >
+                          <span className="fw-semibold d-block">{size.label}</span>
+                          <small className="text-muted">
+                            {size.quantity} disponibl{size.quantity === 1 ? 'e' : 'es'}
+                          </small>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              {!sizeSelectionRequired && versionSelectionRequired && selectedVersionId && (
+                <div className="text-muted small mb-4">
+                  No hay tallas con stock disponible para esta versión.
+                </div>
+              )}
               <div className="mb-4">
                 <Form.Group className="mb-3">
                   <Form.Label>Cantidad</Form.Label>
@@ -959,29 +1344,12 @@ const ProductDetailPage = () => {
               )}
               <div className="d-flex gap-2 align-items-stretch">
                 <Button 
-                  className={stockAvailable ? "btn-cosmetic-primary w-100 rounded-1 mb-3" : "btn-cosmetic-secondary w-100 rounded-1 mb-3"} 
+                  className={disableAddToCart ? "btn-cosmetic-secondary w-100 rounded-1 mb-3" : "btn-cosmetic-primary w-100 rounded-1 mb-3"} 
                   size="lg" 
                   onClick={handleAddToCart}
-                  disabled={!stockAvailable}
+                  disabled={disableAddToCart}
                 >
-                  {!stockAvailable ? (
-                    stockAmount === 0 ? (
-                      <>
-                        <i className="bi bi-x-circle me-2"></i>
-                        Sin stock
-                      </>
-                    ) : (
-                      <>
-                        <i className="bi bi-exclamation-triangle me-2"></i>
-                        Stock insuficiente
-                      </>
-                    )
-                  ) : (
-                    <>
-                      <i className="bi bi-cart-plus me-2"></i>
-                      Añadir al carrito
-                    </>
-                  )}
+                  {renderAddToCartContent()}
                 </Button>
                 <FavouriteButton product={product} size="lg" fullHeight />
               </div>
