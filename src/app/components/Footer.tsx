@@ -46,7 +46,7 @@ const Footer = () => (
               </a>
 
               <a
-                href="https://www.instagram.com/tiffanyssupplies?igsh=MWE3eHd5OTNpbGd1cQ=="
+                href="https://www.instagram.com/spideysports26/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hover:text-pink-500 transition-colors"
@@ -60,10 +60,10 @@ const Footer = () => (
 
               <h5 className="fw-bold mb-3" style={{ color: "var(--cosmetic-accent)" }}>Contáctanos</h5>
               <p className="mb-1" style={{ color: "var(--cosmetic-tertiary)" }}>
-                Email: tiffanysvariedades@gmail.com
+                Email: spideysports26@outlook.com
               </p>
               <p className="mb-0" style={{ color: "var(--cosmetic-tertiary)" }}>
-                Teléfono: +593 987275333
+                Teléfono: +593 963328168
               </p>
             </div>
           </div>
@@ -78,7 +78,7 @@ const Footer = () => (
 
       <div className="text-center">
         <p className="small" style={{ color: "var(--cosmetic-tertiary)" }}>
-          &copy; {new Date().getFullYear()} Tiffany's Variedades. Todos los derechos reservados.
+          &copy; {new Date().getFullYear()} Spidey Sports, todos los derechos reservados.
         </p>
       </div>
     </Container>

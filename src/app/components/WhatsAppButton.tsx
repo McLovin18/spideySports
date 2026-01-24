@@ -13,10 +13,10 @@ interface WhatsAppButtonProps {
 export default function WhatsAppButton({ cartItems, total, deliveryLocation, disabled }: WhatsAppButtonProps) {
   // 🔥 CONFIGURACIÓN: Tu número de WhatsApp 
 
-  const WHATSAPP_NUMBER = "593987275333"; 
+  const WHATSAPP_NUMBER = "593963328168"; // Reemplaza con tu número de WhatsApp en formato internacional sin signos ni espacios
   
   const generateWhatsAppMessage = () => {
-    let message = "¡Hola! Sra Tiffanys Me interesa hacer un pedido desde tu tienda online:\n\n";
+    let message = "¡Hola! Sr Hector, Me interesa hacer un pedido desde tu tienda online:\n\n";
     
     // Agregar productos
     message += "*PRODUCTOS SELECCIONADOS:*\n";
