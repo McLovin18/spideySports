@@ -453,42 +453,56 @@ const DeliveryNotificationPanel: React.FC<DeliveryNotificationPanelProps> = ({
   const handleRequestPermission = async () => {
     try {
       setLoading(true);
-      console.log('🔔 Solicitando permisos de notificación...');
-      
-      // Verificar contexto seguro primero
-      if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
-        alert('❌ Las notificaciones requieren HTTPS. Asegúrate de acceder desde una conexión segura.');
-        return;
-      }
+      console.log('🔔 Iniciando proceso de habilitación de notificaciones...');
       
       const granted = await notificationService.requestNotificationPermission();
-      console.log('🔔 Resultado de permisos:', granted);
+      console.log('🔔 Resultado final de permisos:', granted);
       
       setPermissionGranted(granted);
       
       if (granted) {
         alert('✅ ¡Notificaciones habilitadas correctamente! Ahora recibirás alertas de pedidos.');
       } else {
-        // Mensaje específico según el estado actual
-        const permission = Notification.permission;
-        let message = '❌ No se pudieron habilitar las notificaciones. ';
-        
-        if (permission === 'denied') {
-          message += 'Has bloqueado las notificaciones previamente. Para habilitarlas:\n\n';
-          message += '📱 En móvil: Ve a Configuración del navegador > Notificaciones > Permitir\n';
-          message += '💻 En PC: Haz clic en el ícono del candado/información al lado de la URL';
-        } else {
-          message += 'Verifica que:';
-          message += '\n• Estás usando HTTPS o localhost';
-          message += '\n• Tu navegador soporta notificaciones';
-          message += '\n• No has bloqueado notificaciones para este sitio';
-        }
-        
-        alert(message);
+        // Este caso no debería llegar aquí con la nueva implementación
+        alert('❌ Error inesperado al habilitar notificaciones.');
       }
-    } catch (error) {
-      console.error('Error solicitando permisos:', error);
-      alert('❌ Error técnico al solicitar permisos. Revisa la consola del navegador para más detalles.');
+      
+    } catch (error: any) {
+      console.error('❌ Error en handleRequestPermission:', error);
+      
+      // Mostrar mensaje específico según el tipo de error
+      const errorMessage = error.message || error.toString();
+      
+      let userMessage = '❌ ';
+      
+      if (errorMessage.includes('no soporta notificaciones')) {
+        userMessage += 'Tu navegador no soporta notificaciones push.\n\n';
+        userMessage += '💡 Intenta usar Chrome, Firefox o Safari actualizado.';
+      } else if (errorMessage.includes('HTTPS')) {
+        userMessage += 'Las notificaciones requieren una conexión segura (HTTPS).\n\n';
+        userMessage += '💡 Asegúrate de acceder desde una URL que comience con https://';
+      } else if (errorMessage.includes('denegados') || errorMessage.includes('denied')) {
+        userMessage += 'Has bloqueado las notificaciones para este sitio.\n\n';
+        userMessage += '📱 Para habilitarlas:\n';
+        userMessage += '• En móvil: Ve a Configuración del navegador > Sitios > Notificaciones\n';
+        userMessage += '• En PC: Haz clic en el ícono del candado junto a la URL';
+      } else if (errorMessage.includes('Timeout') || errorMessage.includes('tardó demasiado')) {
+        userMessage += 'La solicitud de permisos tardó demasiado en responder.\n\n';
+        userMessage += '💡 Intenta:\n';
+        userMessage += '• Refrescar la página\n';
+        userMessage += '• Cerrar otras pestañas\n';
+        userMessage += '• Reiniciar el navegador';
+      } else {
+        userMessage += 'Error técnico al solicitar permisos de notificación.\n\n';
+        userMessage += `Detalles: ${errorMessage}\n\n`;
+        userMessage += '💡 Intenta refrescar la página o usar otro navegador.';
+      }
+      
+      alert(userMessage);
+      
+      // No cambiar el estado de permissionGranted en caso de error
+      setPermissionGranted(false);
+      
     } finally {
       setLoading(false);
     }
@@ -502,26 +516,50 @@ const DeliveryNotificationPanel: React.FC<DeliveryNotificationPanelProps> = ({
         <p className="mb-0">
           <small className="text-muted">
             💡 <strong>Importante:</strong> En dispositivos móviles, asegúrate de permitir notificaciones cuando el navegador te lo solicite.
+            <br />
+            🌐 <strong>URL actual:</strong> {window.location.protocol}//{window.location.host}
+            <br />
+            🔒 <strong>Estado:</strong> {window.location.protocol === 'https:' ? '✅ Seguro (HTTPS)' : '❌ No seguro (HTTP)'}
           </small>
         </p>
-        <Button 
-          variant="primary" 
-          onClick={handleRequestPermission}
-          disabled={loading}
-          className="mt-3"
-        >
-          {loading ? (
-            <>
-              <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-              Habilitando...
-            </>
-          ) : (
-            <>
-              <i className="bi bi-bell me-2"></i>
-              Habilitar Notificaciones
-            </>
-          )}
-        </Button>
+        <div className="d-flex gap-2 mt-3 flex-wrap">
+          <Button 
+            variant="primary" 
+            onClick={handleRequestPermission}
+            disabled={loading}
+          >
+            {loading ? (
+              <>
+                <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                Habilitando...
+              </>
+            ) : (
+              <>
+                <i className="bi bi-bell me-2"></i>
+                Habilitar Notificaciones
+              </>
+            )}
+          </Button>
+          
+          {/* Botón de test adicional para debugging */}
+          <Button 
+            variant="outline-secondary" 
+            size="sm"
+            onClick={() => {
+              console.log('🔍 Estado actual de notificaciones:', {
+                supported: 'Notification' in window,
+                permission: Notification.permission,
+                protocol: window.location.protocol,
+                userAgent: navigator.userAgent,
+                timestamp: new Date().toISOString()
+              });
+              alert(`🔍 Debug Info:\n\nSoporte: ${'Notification' in window ? 'Sí' : 'No'}\nPermisos: ${Notification.permission}\nProtocolo: ${window.location.protocol}\nNavegador: ${navigator.userAgent.split(' ').pop()}`);
+            }}
+          >
+            <i className="bi bi-bug me-1"></i>
+            Debug Info
+          </Button>
+        </div>
       </Alert>
     );
   }
@@ -538,6 +576,141 @@ const DeliveryNotificationPanel: React.FC<DeliveryNotificationPanelProps> = ({
           </small>
         </Card.Header>
         <Card.Body>
+          {/* 🔧 PANEL DE CONTROL DE NOTIFICACIONES */}
+          <div className="notification-controls mb-3 p-3 bg-light rounded">
+            <div className="d-flex justify-content-between align-items-center mb-2">
+              <h6 className="mb-0">🔔 Control de Notificaciones</h6>
+              <Badge bg={permissionGranted ? 'success' : 'warning'}>
+                {permissionGranted ? '✅ Habilitadas' : '⚠️ Pendientes'}
+              </Badge>
+            </div>
+            
+            <div className="d-flex gap-2 flex-wrap">
+              {!permissionGranted && (
+                <Button 
+                  variant="primary" 
+                  size="sm"
+                  onClick={handleRequestPermission}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm me-2" role="status"></span>
+                      Habilitando...
+                    </>
+                  ) : (
+                    <>
+                      <i className="bi bi-bell me-2"></i>
+                      Habilitar Notificaciones
+                    </>
+                  )}
+                </Button>
+              )}
+              
+              <Button 
+                variant="outline-info" 
+                size="sm"
+                onClick={() => {
+                  try {
+                    const info = {
+                      supported: 'Notification' in window,
+                      permission: Notification.permission,
+                      protocol: window.location.protocol,
+                      isSecure: window.location.protocol === 'https:' || window.location.hostname === 'localhost',
+                      userAgent: navigator.userAgent,
+                      isMobile: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent),
+                      timestamp: new Date().toISOString()
+                    };
+                    
+                    console.log('🔍 Estado completo de notificaciones:', info);
+                    
+                    let message = '🔍 INFORMACIÓN DE NOTIFICACIONES\n\n';
+                    message += `✅ Soporte del navegador: ${info.supported ? 'SÍ' : 'NO'}\n`;
+                    message += `🔒 Permisos actuales: ${info.permission}\n`;
+                    message += `🌐 Protocolo: ${info.protocol}\n`;
+                    message += `🔐 Conexión segura: ${info.isSecure ? 'SÍ' : 'NO'}\n`;
+                    message += `📱 Dispositivo móvil: ${info.isMobile ? 'SÍ' : 'NO'}\n`;
+                    message += `🕐 Fecha: ${new Date().toLocaleString()}\n\n`;
+                    
+                    if (!info.supported) {
+                      message += '❌ Tu navegador no soporta notificaciones push.';
+                    } else if (!info.isSecure) {
+                      message += '❌ Las notificaciones requieren HTTPS o localhost.';
+                    } else if (info.permission === 'denied') {
+                      message += '❌ Has bloqueado las notificaciones. Ve a configuración del navegador.';
+                    } else if (info.permission === 'granted') {
+                      message += '✅ Las notificaciones están habilitadas correctamente.';
+                    } else {
+                      message += '⏳ Las notificaciones están pendientes de autorización.';
+                    }
+                    
+                    alert(message);
+                  } catch (error) {
+                    console.error('Error obteniendo info de debug:', error);
+                    alert('❌ Error obteniendo información de debug: ' + error);
+                  }
+                }}
+              >
+                <i className="bi bi-info-circle me-1"></i>
+                Debug Info
+              </Button>
+              
+              <Button 
+                variant="outline-success" 
+                size="sm"
+                onClick={async () => {
+                  try {
+                    console.log('🧪 Ejecutando test de notificación manual...');
+                    
+                    if (!('Notification' in window)) {
+                      alert('❌ Tu navegador no soporta notificaciones.');
+                      return;
+                    }
+                    
+                    if (Notification.permission !== 'granted') {
+                      alert('❌ Primero debes habilitar las notificaciones.');
+                      return;
+                    }
+                    
+                    const testNotification = new Notification('🧪 Test SpideySports', {
+                      body: '🚚 Esta es una notificación de prueba del sistema de delivery.',
+                      icon: '/logoWeb.png',
+                      tag: 'test-notification-manual',
+                      requireInteraction: false,
+                      timestamp: Date.now()
+                    });
+                    
+                    testNotification.onshow = () => {
+                      console.log('✅ Test de notificación mostrado correctamente');
+                    };
+                    
+                    testNotification.onerror = (error) => {
+                      console.error('❌ Error en test de notificación:', error);
+                    };
+                    
+                    setTimeout(() => testNotification.close(), 5000);
+                    
+                    alert('✅ Test de notificación enviado. Si no la ves, revisa la configuración.');
+                    
+                  } catch (error) {
+                    console.error('Error en test manual:', error);
+                    alert('❌ Error ejecutando test: ' + error);
+                  }
+                }}
+              >
+                <i className="bi bi-bell-fill me-1"></i>
+                Test Notificación
+              </Button>
+            </div>
+            
+            <div className="mt-2">
+              <small className="text-muted">
+                🔒 <strong>Estado:</strong> {window.location.protocol === 'https:' ? '✅ HTTPS Seguro' : '❌ HTTP No Seguro'} | 
+                📱 <strong>Dispositivo:</strong> {/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ? 'Móvil' : 'Desktop'}
+              </small>
+            </div>
+          </div>
+
           {/*  SECCIÓN DE NOTIFICACIONES NUEVAS */}
           {notifications.length === 0 ? (
             <Alert variant="light" className="text-center">

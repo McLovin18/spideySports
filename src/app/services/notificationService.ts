@@ -139,16 +139,18 @@ export class NotificationService {
   // 🔔 SOLICITAR PERMISOS DE NOTIFICACIÓN
   async requestNotificationPermission(): Promise<boolean> {
     try {
+      console.log('🔔 Iniciando solicitud de permisos de notificación...');
+      
       // Verificar soporte para notificaciones
       if (!('Notification' in window)) {
-        console.warn('Este navegador no soporta notificaciones');
-        return false;
+        console.warn('❌ Este navegador no soporta notificaciones');
+        throw new Error('Tu navegador no soporta notificaciones push');
       }
 
       // Verificar contexto seguro (HTTPS) - requerido para notificaciones en móviles
       if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
         console.warn('❌ Las notificaciones requieren HTTPS en dispositivos móviles');
-        return false;
+        throw new Error('Las notificaciones requieren una conexión HTTPS segura');
       }
 
       // Si ya están concedidos
@@ -160,70 +162,158 @@ export class NotificationService {
       // Si fueron denegados previamente
       if (Notification.permission === 'denied') {
         console.warn('❌ Permisos de notificación denegados previamente');
-        console.warn('💡 Para habilitar: Ve a configuración del navegador > Notificaciones');
-        return false;
+        throw new Error('Los permisos de notificación fueron denegados. Ve a configuración del navegador para habilitarlos.');
       }
 
-      // Solicitar permisos
-      console.log('🔔 Solicitando permisos de notificación...');
-      
-      // Para dispositivos móviles, mostrar instrucciones claras
+      // Detectar dispositivo móvil y navegador específico
       const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      const isAndroid = /Android/.test(navigator.userAgent);
+      const isChrome = /Chrome/.test(navigator.userAgent);
+      const isFirefox = /Firefox/.test(navigator.userAgent);
+      const isSafari = /Safari/.test(navigator.userAgent) && !isChrome;
       
-      if (isMobile) {
-        console.log('📱 Dispositivo móvil detectado - mostrando instrucciones específicas');
+      console.log(`📱 Dispositivo: ${isMobile ? 'Móvil' : 'Desktop'}, iOS: ${isIOS}, Android: ${isAndroid}, Chrome: ${isChrome}, Firefox: ${isFirefox}, Safari: ${isSafari}`);
+
+      // En algunos dispositivos móviles, especialmente iOS Safari, las notificaciones no funcionan bien
+      if (isIOS && isSafari) {
+        throw new Error('Safari en iOS tiene limitaciones con notificaciones push. Intenta usar Chrome o Firefox en iOS.');
       }
+
+      // Solicitar permisos con timeout para evitar cuelgues
+      console.log('🔔 Ejecutando Notification.requestPermission()...');
       
-      // Usar método compatible con todos los navegadores
       let permission: NotificationPermission;
       
-      if (Notification.requestPermission.length) {
-        // Método legacy con callback
-        permission = await new Promise((resolve) => {
-          Notification.requestPermission(resolve);
+      try {
+        // Crear una Promise con timeout más largo para móviles (15 segundos)
+        const timeoutDuration = isMobile ? 15000 : 10000;
+        const timeoutPromise = new Promise<NotificationPermission>((_, reject) => {
+          setTimeout(() => reject(new Error(`Timeout: La solicitud de permisos tardó más de ${timeoutDuration/1000} segundos. Esto puede indicar que el navegador bloqueó la solicitud.`)), timeoutDuration);
         });
-      } else {
-        // Método moderno con Promise
-        permission = await Notification.requestPermission();
+
+        // Ejecutar solicitud de permisos con diferentes métodos según soporte
+        const permissionPromise = new Promise<NotificationPermission>((resolve, reject) => {
+          try {
+            // Para dispositivos móviles, mostrar alerta previa
+            if (isMobile) {
+              console.log('📱 Dispositivo móvil: preparando solicitud de permisos...');
+            }
+            
+            if (typeof Notification.requestPermission === 'function') {
+              const result = Notification.requestPermission();
+              
+              // Si retorna una Promise (navegadores modernos)
+              if (result && typeof result.then === 'function') {
+                console.log('🔄 Usando método moderno (Promise)');
+                result.then(resolve).catch(reject);
+              } else {
+                // Si no retorna Promise, usar callback (navegadores legacy)
+                console.log('🔄 Usando método legacy (callback)');
+                Notification.requestPermission((perm: NotificationPermission) => {
+                  resolve(perm);
+                });
+              }
+            } else {
+              reject(new Error('Método requestPermission no disponible en este navegador'));
+            }
+          } catch (err) {
+            console.error('❌ Error interno en solicitud de permisos:', err);
+            reject(err);
+          }
+        });
+
+        // Usar Promise.race para aplicar timeout
+        permission = await Promise.race([permissionPromise, timeoutPromise]);
+        
+      } catch (timeoutError: any) {
+        console.error('❌ Error o timeout en requestPermission:', timeoutError);
+        
+        if (timeoutError.message?.includes('Timeout')) {
+          if (isMobile) {
+            throw new Error('La solicitud de permisos tardó demasiado en dispositivos móviles. Esto suele pasar cuando:\n\n• El navegador no muestra el diálogo de permisos\n• Has bloqueado previamente las notificaciones\n• El navegador no soporta bien las notificaciones\n\nIntenta:\n• Refrescar la página\n• Ir a configuración del navegador > Sitios > Notificaciones\n• Usar Chrome o Firefox');
+          } else {
+            throw new Error('La solicitud de permisos tardó demasiado. Intenta refrescar la página o verificar la configuración del navegador.');
+          }
+        } else {
+          throw timeoutError;
+        }
       }
       
-      console.log('🔔 Resultado de solicitud:', permission);
+      console.log('🔔 Resultado de solicitud de permisos:', permission);
       
       if (permission === 'granted') {
         console.log('✅ Notificaciones habilitadas correctamente');
         
-        // Mostrar notificación de prueba
-        this.showTestNotification();
+        // Mostrar notificación de prueba (con manejo de errores)
+        try {
+          this.showTestNotification();
+        } catch (testError) {
+          console.warn('⚠️ No se pudo mostrar notificación de prueba:', testError);
+        }
         
         return true;
+      } else if (permission === 'denied') {
+        throw new Error('Has denegado los permisos de notificación. Para habilitarlos:\n\n📱 En móvil: Ve a configuración del navegador > Sitios > Permisos > Notificaciones\n💻 En desktop: Haz clic en el ícono del candado junto a la URL');
       } else {
-        console.warn('❌ Notificaciones no fueron habilitadas:', permission);
-        return false;
+        throw new Error(`No se pudo obtener permiso para las notificaciones. Estado recibido: ${permission}`);
       }
-    } catch (error) {
-      console.error('Error solicitando permisos de notificación:', error);
-      return false;
+      
+    } catch (error: any) {
+      console.error('❌ Error completo en requestNotificationPermission:', error);
+      throw error; // Re-lanzar el error para que sea manejado por el componente
     }
   }
 
   // 🧪 MOSTRAR NOTIFICACIÓN DE PRUEBA
   private showTestNotification(): void {
     try {
+      console.log('🧪 Mostrando notificación de prueba...');
+      
+      // Verificar una vez más que los permisos están concedidos
+      if (Notification.permission !== 'granted') {
+        console.warn('⚠️ Intentando mostrar notificación sin permisos concedidos');
+        return;
+      }
+      
       const notification = new Notification('🚚 SpideySports Delivery', {
-        body: '✅ ¡Notificaciones habilitadas! Recibirás alertas de pedidos.',
-        icon: '/logoWeb.png', // Usar el logo existente
+        body: '✅ ¡Notificaciones habilitadas! Recibirás alertas de nuevos pedidos.',
+        icon: '/logoWeb.png',
         tag: 'spidey-delivery-test',
         requireInteraction: false,
-        silent: false
+        silent: false,
+        timestamp: Date.now(),
+        data: { type: 'test', source: 'spidey-delivery' }
       });
 
-      // Auto-cerrar después de 3 segundos
-      setTimeout(() => {
+      // Manejar eventos de la notificación
+      notification.onshow = () => {
+        console.log('✅ Notificación de prueba mostrada correctamente');
+      };
+
+      notification.onerror = (error) => {
+        console.error('❌ Error mostrando notificación de prueba:', error);
+      };
+
+      notification.onclick = () => {
+        console.log('👆 Usuario hizo clic en notificación de prueba');
         notification.close();
-      }, 3000);
+        window.focus();
+      };
+
+      // Auto-cerrar después de 4 segundos
+      setTimeout(() => {
+        try {
+          notification.close();
+          console.log('🔄 Notificación de prueba cerrada automáticamente');
+        } catch (closeError) {
+          console.log('⚠️ Error al cerrar notificación:', closeError);
+        }
+      }, 4000);
 
     } catch (error) {
-      console.log('No se pudo mostrar notificación de prueba:', error);
+      console.error('❌ Error creando notificación de prueba:', error);
+      // No relanzar el error - la notificación de prueba es opcional
     }
   }
 
