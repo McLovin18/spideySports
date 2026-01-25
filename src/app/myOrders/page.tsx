@@ -291,7 +291,7 @@ const MyOrdersPage = () => {
                         {purchase.items.map((item: any, i: number) => (
                           <Col xs={12} sm={6} md={4} key={i}>
                             <div className="d-flex align-items-center p-2 bg-light rounded">
-                              <Image src={item.image} alt={item.name} width={40} height={40} className="me-3 rounded" />
+                              <Image src={item.image} alt={item.name} width={40} height={40} className="me-3 rounded inventory-image" />
                               <div className="flex-grow-1">
                                 <div className="fw-bold small">{item.name}</div>
                                 <div className="text-muted small">Cantidad: {item.quantity}</div>

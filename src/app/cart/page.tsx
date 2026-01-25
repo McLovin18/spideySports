@@ -522,7 +522,7 @@ const CartPage = () => {
                       <Card key={item.id} className="mb-4 border-0 shadow-sm">
                         <Row className="g-0 align-items-center">
                           <Col xs={4} md={3} className="p-3">
-                            <Image src={item.image} alt={item.name} width={100} height={120} style={{ objectFit: 'cover', borderRadius: '0.5rem' }} />
+                            <Image src={item.image} alt={item.name} width={100} height={120} style={{ objectFit: 'cover', borderRadius: '0.5rem' }} className="inventory-image" />
                           </Col>
                           <Col xs={8} md={9} className="p-3">
                             <div className="d-flex justify-content-between align-items-center mb-2">

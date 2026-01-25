@@ -80,7 +80,7 @@ const createFallbackImageService = () => {
               reject(new Error('Error comprimiendo imagen'));
             }
           },
-          'image/jpeg',
+          'image/png',
           quality
         );
       };
@@ -994,13 +994,13 @@ export default function ProductFormModal({ show, onHide, product, onProductSaved
                           Sube la foto de esta versión directamente desde tu computadora.
                         </Form.Text>
                         {(versionPreviews[version.id] || version.imageUrl) && (
-                          <div className="mt-3 text-center">
+                          <div className="mt-3 text-center image-preview-container">
                             <Image
                               src={versionPreviews[version.id] || version.imageUrl}
                               alt={version.label || `Previsualización versión ${index + 1}`}
                               fluid
                               rounded
-                              className="border"
+                              className="border inventory-image preview-image"
                             />
                             <Button
                               variant="link"

@@ -42,6 +42,79 @@ input:valid, textarea:valid, select:valid, .form-control:valid
   border-color: transparent !important;
 }
 
+/* Estilos para imágenes de inventario con transparencia */
+.inventory-image {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+.table img,
+.inventory-image,
+.product-image {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+/* Contenedor de imágenes para que se adapte al fondo */
+.image-container {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+/* Estilos específicos para imágenes en modales y formularios */
+.modal img,
+.modal .inventory-image,
+.form-control + div img,
+.preview-image {
+  background: transparent !important;
+  background-color: transparent !important;
+  mix-blend-mode: normal;
+}
+
+/* Eliminar cualquier fondo negro en contenedores de imágenes */
+.image-preview-container,
+.product-image-container,
+.version-image-container {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+/* Estilos específicos para React Bootstrap Image component */
+.img-fluid,
+.rounded {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+/* Para imágenes en cards y contenedores con fondo teal/dark */
+.card img,
+.card .inventory-image,
+.bg-dark img,
+.bg-teal img {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+/* Clase específica para contenedores de imágenes de productos */
+.product-image-background {
+  background: rgba(5, 44, 51, 0.92) !important;
+  background-color: rgba(5, 44, 51, 0.92) !important;
+}
+
+/* Sobrescribir cualquier fondo cosmetic-secondary en contenedores de imágenes */
+.position-relative.bg-cosmetic-secondary {
+  background: rgba(5, 44, 51, 0.92) !important;
+  background-color: rgba(5, 44, 51, 0.92) !important;
+}
+
+/* Eliminar fondos negros específicos en elementos canvas o divs de imagen */
+canvas,
+.image-canvas,
+.product-preview {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -403,6 +476,367 @@ input:valid, textarea:valid, select:valid, .form-control:valid {
 /* Separadores sutiles entre comentarios */
 .card.mb-3.border-0.shadow-sm:not(:last-child) {
   border-bottom: 1.5px solid #f0f0f0 !important;
+}
+
+/* SpideySports product comments */
+.product-comments-container {
+  background: linear-gradient(135deg, rgba(2, 44, 54, 0.96) 0%, rgba(3, 67, 80, 0.96) 55%, rgba(4, 97, 114, 0.95) 100%);
+  border-radius: 1.6rem;
+  padding: 2.5rem 2.25rem;
+  border: 1px solid rgba(6, 151, 174, 0.38);
+  box-shadow: 0 34px 82px -42px rgba(4, 104, 120, 0.55);
+  color: var(--cosmetic-tertiary);
+}
+
+.product-comments-container h3,
+.product-comments-container h5,
+.product-comments-container label {
+  color: rgba(237, 250, 252, 0.94) !important;
+}
+
+.product-comments-summary {
+  background: rgba(223, 247, 250, 0.12);
+  border: 1px solid rgba(6, 151, 174, 0.26);
+  border-radius: 1.05rem;
+  padding: 1.1rem 1.4rem;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  margin-bottom: 1.8rem;
+}
+
+.product-rating-display {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  font-size: 1.6rem;
+}
+
+.product-rating-value {
+  font-size: 0.96rem;
+  font-weight: 600;
+  color: rgba(226, 232, 240, 0.78);
+}
+
+.rating-star-shell {
+  position: relative;
+  display: inline-block;
+  width: 1.25em;
+  line-height: 1;
+}
+
+.rating-star-base {
+  color: rgba(15, 41, 48, 0.2);
+}
+
+.rating-star-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: hidden;
+  color: #e63946 !important;
+  text-shadow: 0 0 10px rgba(230, 57, 70, 0.35) !important;
+}
+
+.product-rating-input {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 1.45rem;
+}
+
+.rating-input-star {
+  cursor: pointer;
+  color: rgba(148, 163, 184, 0.45) !important;
+  transition: transform 0.2s ease, color 0.2s ease, text-shadow 0.2s ease;
+}
+
+.rating-input-star:hover,
+.rating-input-star:focus {
+  color: #e63946 !important;
+  text-shadow: 0 0 10px rgba(230, 57, 70, 0.4) !important;
+  outline: none;
+  transform: translateY(-1px) scale(1.05);
+}
+
+.rating-input-star.is-active {
+  color: #e63946 !important;
+  text-shadow: 0 0 10px rgba(230, 57, 70, 0.4) !important;
+}
+
+.product-comment-form {
+  background: rgba(221, 247, 250, 0.16) !important;
+  border: 1px solid rgba(6, 151, 174, 0.34) !important;
+  box-shadow: 0 30px 80px -46px rgba(4, 104, 120, 0.55) !important;
+  backdrop-filter: blur(7px);
+}
+
+.product-comment-input-shell {
+  position: relative;
+  min-height: 72px;
+  background: rgba(216, 245, 249, 0.96);
+  border: 1px solid rgba(3, 123, 144, 0.35);
+  border-radius: 0.95rem;
+  padding: 12px 18px 14px 18px;
+  box-shadow: inset 0 1px 0 rgba(3, 40, 46, 0.08);
+}
+
+.product-comment-form .youtube-input,
+.product-comment-form .youtube-input:focus {
+  border-bottom: 1.5px solid rgba(3, 123, 144, 0.35) !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  color: #0b1f24 !important;
+}
+
+.product-comment-form .youtube-input::placeholder {
+  color: rgba(11, 31, 36, 0.55) !important;
+}
+
+.product-comment-form .youtube-input:focus {
+  border-bottom: 1.5px solid rgba(6, 151, 174, 0.62) !important;
+}
+
+.product-comment-emoji-picker {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 8px);
+  z-index: 99;
+  background: rgba(221, 247, 250, 0.94);
+  border: 1px solid rgba(6, 151, 174, 0.34);
+  box-shadow: 0 28px 70px -40px rgba(4, 104, 120, 0.48);
+  border-radius: 0.9rem;
+  padding: 10px 12px 8px 12px;
+  min-width: 220px;
+  max-width: 320px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  max-height: 190px;
+  overflow-y: auto;
+}
+
+.product-comment-emoji-picker::-webkit-scrollbar {
+  width: 6px;
+}
+
+.product-comment-emoji-picker::-webkit-scrollbar-thumb {
+  background: rgba(6, 151, 174, 0.45);
+  border-radius: 6px;
+}
+
+.product-comment-emoji {
+  font-size: 1.35rem;
+  cursor: pointer;
+  border-radius: 0.5rem;
+  padding: 4px 6px;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.product-comment-emoji:hover {
+  background: rgba(6, 151, 174, 0.18);
+  transform: translateY(-1px) scale(1.05);
+}
+
+.product-comment-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 12px;
+  gap: 1rem;
+}
+
+.product-comment-actions-buttons {
+  display: flex;
+  gap: 0.85rem;
+  align-items: center;
+}
+
+.product-comment-emoji-trigger {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.35rem;
+  color: rgba(9, 70, 82, 0.8);
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.product-comment-emoji-trigger:hover,
+.product-comment-emoji-trigger:focus {
+  color: #e63946;
+  transform: translateY(-1px) scale(1.07);
+  outline: none;
+}
+
+.product-comments-feedback {
+  color: rgba(226, 250, 252, 0.8) !important;
+}
+
+.product-comment-card {
+  display: flex;
+  gap: 1.25rem;
+  background: rgba(228, 248, 252, 0.94);
+  border: 1px solid rgba(6, 151, 174, 0.32);
+  border-radius: 1.2rem;
+  padding: 1.45rem 1.7rem;
+  box-shadow: 0 30px 84px -50px rgba(4, 104, 120, 0.5);
+}
+
+.product-comment-avatar {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 1px solid rgba(6, 151, 174, 0.32);
+  background: rgba(216, 245, 249, 0.7);
+  flex-shrink: 0;
+}
+
+.product-comment-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.55rem;
+}
+
+.product-comment-author {
+  font-weight: 600;
+  color: #0a3d49 !important;
+}
+
+.product-comment-stars {
+  display: inline-flex;
+  gap: 0.2rem;
+  font-size: 1.05rem;
+  color: rgba(3, 67, 80, 0.35) !important;
+}
+
+.rating-static-star.is-active {
+  color: #e63946 !important;
+  text-shadow: 0 0 8px rgba(230, 57, 70, 0.3) !important;
+}
+
+.product-comment-date {
+  font-size: 0.82rem;
+  color: rgba(11, 31, 36, 0.5) !important;
+}
+
+.product-comment-text {
+  margin: 0 0 0.7rem 0;
+  font-size: 0.98rem;
+  line-height: 1.45;
+  color: #111111 !important;
+  word-break: break-word;
+}
+
+.product-comment-replies {
+  margin-top: 1rem;
+  padding-left: 1.25rem;
+  border-left: 2px solid rgba(6, 151, 174, 0.34);
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.product-comment-reply-card {
+  display: flex;
+  gap: 0.75rem;
+  background: rgba(223, 245, 248, 0.92);
+  border: 1px solid rgba(6, 151, 174, 0.3);
+  border-radius: 0.95rem;
+  padding: 0.85rem 1.1rem;
+  box-shadow: 0 26px 64px -48px rgba(4, 104, 120, 0.45);
+}
+
+.product-comment-reply-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 1px solid rgba(6, 151, 174, 0.3);
+  background: rgba(216, 245, 249, 0.65);
+  flex-shrink: 0;
+}
+
+.product-comment-reply-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.45rem;
+  margin-bottom: 0.35rem;
+}
+
+.product-comment-reply-text {
+  font-size: 0.95rem;
+  line-height: 1.38;
+  color: #0b1f24 !important;
+  margin: 0;
+}
+
+.product-comments-action {
+  font-size: 0.95rem !important;
+  font-weight: 500;
+  color: #037b90 !important;
+  padding: 0 !important;
+  border: none !important;
+  background: none !important;
+  transition: color 0.2s ease;
+}
+
+.product-comments-action:hover,
+.product-comments-action:focus {
+  color: #e63946 !important;
+  text-decoration: none !important;
+  outline: none;
+}
+
+.product-comment-reply-form {
+  position: relative;
+}
+
+.product-comment-reply-form .youtube-input,
+.product-comment-reply-form .youtube-input:focus {
+  border-bottom: 1.5px solid rgba(3, 123, 144, 0.32) !important;
+  box-shadow: none !important;
+  background: rgba(216, 245, 249, 0.92) !important;
+  color: #0b1f24 !important;
+}
+
+.product-comment-reply-form .youtube-input::placeholder {
+  color: rgba(11, 31, 36, 0.55) !important;
+}
+
+.product-comment-reply-emoji {
+  position: absolute;
+  right: 6px;
+  bottom: 10px;
+}
+
+.product-comment-reply-picker {
+  left: auto;
+  right: 0;
+}
+
+.product-comment-reply-submit {
+  margin-top: 0.25rem;
+  box-shadow: 0 24px 60px -34px rgba(3, 123, 144, 0.6) !important;
+}
+
+@media (max-width: 768px) {
+  .product-comments-container {
+    padding: 1.8rem 1.2rem;
+    border-radius: 1.3rem;
+  }
+
+  .product-comment-card {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 1.15rem 1.1rem;
+  }
+
+  .product-comment-replies {
+    padding-left: 0.9rem;
+  }
 }
 
 /* Footer apilado en mobile */

@@ -307,12 +307,12 @@ const ProductsPage = () => {
                       }}
                     >
                       <div
-                        className="position-relative bg-cosmetic-secondary"
+                        className="position-relative bg-cosmetic-secondary product-image-background"
                         style={{
                           width: 'auto',
                           height: '300px',
                           margin: '0 auto',
-                          background: '#fff',
+                          background: 'rgba(5, 44, 51, 0.92) !important',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',

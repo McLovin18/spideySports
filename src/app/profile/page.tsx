@@ -547,7 +547,7 @@ const ProfilePage = () => {
                                       <div className="mt-1">
                                         {purchase.items.map((item: { id: string; name: string; image: string; quantity: number }, i: number) => (
                                           <div key={i} className="d-flex align-items-center mb-1">
-                                            <Image src={item.image} alt={item.name} width={35} height={35} className="me-2 rounded-1" />
+                                            <Image src={item.image} alt={item.name} width={35} height={35} className="me-2 rounded-1 inventory-image" />
                                             <span className="small">
                                               <strong>{item.name}</strong> 
                                               <span className="text-muted"> (Cantidad: {item.quantity})</span>
@@ -609,7 +609,7 @@ const ProfilePage = () => {
                               <Card className="mb-4 border-0 shadow-sm text-start">
                                 <Card.Body>
                                   <div className="d-flex align-items-center mb-3">
-                                    <Image src={fav.image} alt={fav.name} width={60} height={60} className="me-3 rounded-1" />
+                                    <Image src={fav.image} alt={fav.name} width={60} height={60} className="me-3 rounded-1 inventory-image" />
                                     <div>
                                       <h5 className="fw-bold mb-1">{fav.name}</h5>
                                       <div className="fw-bold mb-1" style={{ color: "var(--cosmetic-primary)" }}>${fav.price.toFixed(2)}</div>

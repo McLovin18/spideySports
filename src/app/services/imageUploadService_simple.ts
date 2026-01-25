@@ -54,7 +54,7 @@ class ImageUploadService {
               reject(new Error('Error comprimiendo imagen'));
             }
           },
-          'image/jpeg', // Usar JPEG para mejor compresión
+          'image/png', // Usar PNG para preservar transparencia
           quality
         );
       };

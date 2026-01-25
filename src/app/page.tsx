@@ -258,12 +258,12 @@ export default function Home() {
                     onClick={() => handleCardClick(product.id)}
                   >
                     <div
-                      className="position-relative bg-cosmetic-secondary"
+                      className="position-relative bg-cosmetic-secondary product-image-background"
                       style={{
                         width: 'auto',
                         height: '260px',
                         margin: '0 auto',
-                        background: 'rgba(3,24,27,0.75)',
+                        background: 'rgba(5, 44, 51, 0.92) !important',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -392,13 +392,12 @@ export default function Home() {
                   onClick={() => handleCardClick(product.id)}
                 >
                   <div
-                    className="position-relative bg-cosmetic-secondary"
+                    className="position-relative bg-cosmetic-secondary product-image-background"
                     style={{
                       width: 'auto',
                       height: '300px',
                       margin: '0 auto',
-                      background: '#fff',
-                      background: 'rgba(3,24,27,0.75)',
+                      background: 'rgba(5, 44, 51, 0.92) !important',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -527,12 +526,12 @@ export default function Home() {
                     >
                       {/* Imagen del Producto */}
                       <div
-                        className="position-relative bg-cosmetic-secondary"
+                        className="position-relative bg-cosmetic-secondary product-image-background"
                         style={{
                           width: 'auto',
                           height: '300px',
                           margin: '0 auto',
-                          background: 'rgba(3,24,27,0.75)',
+                          background: 'rgba(5, 44, 51, 0.92) !important',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',

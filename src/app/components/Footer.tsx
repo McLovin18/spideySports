@@ -18,7 +18,7 @@ const Footer = () => (
 
         <Col xs={12} md={5} className="d-flex align-items-center justify-content-center flex-column text-center">
 
-          <img className='logo_img' style={ { maxWidth: "360px", height: "auto"}} src="/logo.png" alt="Logo" />
+          <img className='logo_img' style={ { maxWidth: "240px", height: "auto"}} src="/logoWeb.png" alt="Logo" />
 
         </Col>
 

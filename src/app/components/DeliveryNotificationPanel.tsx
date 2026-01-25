@@ -449,16 +449,78 @@ const DeliveryNotificationPanel: React.FC<DeliveryNotificationPanelProps> = ({
     );
   }
 
+  // 🔔 MANEJAR SOLICITUD DE PERMISOS DE NOTIFICACIÓN
+  const handleRequestPermission = async () => {
+    try {
+      setLoading(true);
+      console.log('🔔 Solicitando permisos de notificación...');
+      
+      // Verificar contexto seguro primero
+      if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+        alert('❌ Las notificaciones requieren HTTPS. Asegúrate de acceder desde una conexión segura.');
+        return;
+      }
+      
+      const granted = await notificationService.requestNotificationPermission();
+      console.log('🔔 Resultado de permisos:', granted);
+      
+      setPermissionGranted(granted);
+      
+      if (granted) {
+        alert('✅ ¡Notificaciones habilitadas correctamente! Ahora recibirás alertas de pedidos.');
+      } else {
+        // Mensaje específico según el estado actual
+        const permission = Notification.permission;
+        let message = '❌ No se pudieron habilitar las notificaciones. ';
+        
+        if (permission === 'denied') {
+          message += 'Has bloqueado las notificaciones previamente. Para habilitarlas:\n\n';
+          message += '📱 En móvil: Ve a Configuración del navegador > Notificaciones > Permitir\n';
+          message += '💻 En PC: Haz clic en el ícono del candado/información al lado de la URL';
+        } else {
+          message += 'Verifica que:';
+          message += '\n• Estás usando HTTPS o localhost';
+          message += '\n• Tu navegador soporta notificaciones';
+          message += '\n• No has bloqueado notificaciones para este sitio';
+        }
+        
+        alert(message);
+      }
+    } catch (error) {
+      console.error('Error solicitando permisos:', error);
+      alert('❌ Error técnico al solicitar permisos. Revisa la consola del navegador para más detalles.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (!permissionGranted) {
     return (
       <Alert variant="info">
         <Alert.Heading>🔔 Permisos de Notificación</Alert.Heading>
         <p>Necesitas habilitar las notificaciones para recibir alertas de pedidos.</p>
+        <p className="mb-0">
+          <small className="text-muted">
+            💡 <strong>Importante:</strong> En dispositivos móviles, asegúrate de permitir notificaciones cuando el navegador te lo solicite.
+          </small>
+        </p>
         <Button 
           variant="primary" 
-          onClick={() => notificationService.requestNotificationPermission().then(setPermissionGranted)}
+          onClick={handleRequestPermission}
+          disabled={loading}
+          className="mt-3"
         >
-          Habilitar Notificaciones
+          {loading ? (
+            <>
+              <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+              Habilitando...
+            </>
+          ) : (
+            <>
+              <i className="bi bi-bell me-2"></i>
+              Habilitar Notificaciones
+            </>
+          )}
         </Button>
       </Alert>
     );

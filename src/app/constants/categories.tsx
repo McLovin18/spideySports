@@ -11,7 +11,9 @@ export const SUBCATEGORIES = [
   { id: "clubKits", value: "premier-league", label: "Premier League (Inglaterra)", minId: 1200, maxId: 1399 },
   { id: "clubKits", value: "serie-a", label: "Serie A (Italia)", minId: 1400, maxId: 1599 },
   { id: "clubKits", value: "bundesliga", label: "Bundesliga (Alemania)", minId: 1600, maxId: 1799 },
-  { id: "clubKits", value: "ligue-1", label: "Ligue 1 (Francia)", minId: 1800, maxId: 1999 },
+  { id: "clubKits", value: "ligue-1", label: "Ligue 1 (Francia)", minId: 1800, maxId: 1899 },
+    { id: "clubKits", value: "liga-sudamericana", label: "Liga Sudamericana", minId: 1900, maxId: 1999 },
+
 
   // Categoría 2: Selecciones Nacionales (2000-2999)
   { id: "nationalTeams", value: "europe", label: "Europa (UEFA)", minId: 2000, maxId: 2199 },

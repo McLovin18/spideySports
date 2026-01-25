@@ -1094,7 +1094,7 @@ const ProductDetailPage = () => {
           <Row className="g-5 align-items-center">
             <Col xs={12} md={6} style={{ width: '40%' }}>
               <Card className="border-0 shadow-sm bg-cosmetic-secondary">
-                <div className="position-relative bg-cosmetic-secondary" style={{ width: '300px', height: '450px', margin: '0 auto', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '1rem 1rem 0 0', overflow: 'hidden' }}>
+                <div className="position-relative bg-cosmetic-secondary product-image-background" style={{ width: '300px', height: '450px', margin: '0 auto', background: 'rgba(5, 44, 51, 0.92) !important', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '1rem 1rem 0 0', overflow: 'hidden' }}>
                   {discountInfo && (
                     <div
                       className="position-absolute"
@@ -1360,69 +1360,67 @@ const ProductDetailPage = () => {
 
       {/* Sección de comentarios */}
       <div className="my-5">
-        <Container>
-          <div className="mb-3">
-            <h5 className="fw-bold">Calificación promedio:</h5>
-
-            <div style={{ fontSize: "1.5rem", color: "#e63946" }}>
+        <Container className="product-comments-container">
+          <div className="product-comments-summary">
+            <h5 className="fw-bold mb-2">Calificación promedio:</h5>
+            <div
+              className="product-rating-display"
+              aria-label={`Calificación promedio ${averageRating.toFixed(1)} de 5`}
+            >
               {[1, 2, 3, 4, 5].map((star) => {
-                const full = star <= Math.floor(averageRating); // Estrella llena
-                const half = star === Math.ceil(averageRating) && averageRating % 1 >= 0.5; // Media estrella
+                const full = star <= Math.floor(averageRating);
+                const half = star === Math.ceil(averageRating) && averageRating % 1 >= 0.5;
+                const fillWidth = full ? "100%" : half ? "50%" : "0%";
 
                 return (
-                  <span
-                    key={star}
-                    style={{
-                      position: "relative",
-                      display: "inline-block",
-                      width: "1.2em",
-                    }}
-                  >
-                    <span style={{ color: "#ccc" }}>★</span>
-                    <span
-                      style={{
-                        color: "#e63946",
-                        position: "absolute",
-                        top: 0,
-                        left: 0,
-                        width: full ? "100%" : half ? "50%" : "0%",
-                        overflow: "hidden",
-                      }}
-                    >
-                      ★
-                    </span>
+                  <span key={star} className="rating-star-shell">
+                    <span className="rating-star-base">★</span>
+                    <span className="rating-star-fill" style={{ width: fillWidth }}>★</span>
                   </span>
                 );
               })}
-              <span className="ms-2">({averageRating.toFixed(1)}/5)</span>
+              <span className="product-rating-value">({averageRating.toFixed(1)}/5)</span>
             </div>
           </div>
 
           <h3 className="fw-bold mb-4">Comentarios</h3>
 
-          {/* Formulario de nuevo comentario */}
           {user ? (
-            <Form onSubmit={handleAddComment} className="mb-4 p-3 rounded shadow-sm bg-cosmetic-secondary">
-              <Row className="g-2 align-items-center">
-                <Col xs={12} className="d-flex align-items-start gap-2">
-                  {/* Avatar del usuario */}
-                  <div style={{ width: "40px", height: "40px", borderRadius: "50%", overflow: "hidden", border: "1px solid #eee", background: "#f7f7f7", marginTop: 2 }}>
-                    <img src={user?.photoURL || "/new_user.png"} alt="avatar" width={40} height={40} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            <Form
+              onSubmit={handleAddComment}
+              className="mb-4 p-3 rounded shadow-sm product-comment-form"
+            >
+              <Row className="g-3 align-items-start">
+                <Col xs={12} className="d-flex align-items-start gap-3">
+                  <div className="product-comment-avatar">
+                    <Image
+                      src={user?.photoURL || "/new_user.png"}
+                      alt="avatar"
+                      width={40}
+                      height={40}
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                    />
                   </div>
                   <div className="flex-grow-1">
-                    <Form.Group className="w-100 mb-2">
-                      <Form.Label className="mb-1" style={{ fontWeight: 500, fontSize: "0.98rem" }}>Calificación</Form.Label>
-                      <div style={{ fontSize: "1.3rem", color: "#e63946", marginBottom: 4 }}>
+                    <Form.Group className="w-100 mb-3">
+                      <Form.Label className="mb-2" style={{ fontWeight: 500, fontSize: "0.98rem" }}>
+                        Calificación
+                      </Form.Label>
+                      <div className="product-rating-input">
                         {[1, 2, 3, 4, 5].map((star) => (
                           <span
                             key={star}
-                            style={{
-                              cursor: "pointer",
-                              filter: star > rating ? "grayscale(1)" : "none",
-                              transition: "filter 0.2s",
-                              fontSize: "1.3rem"
-                            }}
+                            role="button"
+                            tabIndex={0}
+                            className={`rating-input-star ${star <= rating ? "is-active" : ""}`}
                             onClick={() => setRating(star)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                setRating(star);
+                              }
+                            }}
+                            aria-label={`Calificar con ${star} estrella${star > 1 ? "s" : ""}`}
                           >
                             ★
                           </span>
@@ -1430,16 +1428,10 @@ const ProductDetailPage = () => {
                       </div>
                     </Form.Group>
                     <Form.Group className="w-100 mb-0">
-                      <Form.Label className="mb-1" style={{ fontWeight: 500, fontSize: "0.98rem" }}>Comentario</Form.Label>
-                      <div style={{
-                        background: "#fff",
-                        borderRadius: "0.7rem",
-                        boxShadow: "0 2px 8px -4px rgba(0,0,0,0.07)",
-                        border: "1px solid #eee",
-                        padding: "12px 18px 0 18px",
-                        position: "relative",
-                        minHeight: "70px"
-                      }}>
+                      <Form.Label className="mb-2" style={{ fontWeight: 500, fontSize: "0.98rem" }}>
+                        Comentario
+                      </Form.Label>
+                      <div className="product-comment-input-shell">
                         <Form.Control
                           as="textarea"
                           rows={1}
@@ -1449,360 +1441,298 @@ const ProductDetailPage = () => {
                             minHeight: "38px",
                             maxHeight: "120px",
                             fontSize: "1rem",
-                            padding: "8px 36px 8px 0px",
-                            border: "none",
-                            borderRadius: "0px",
-                            borderBottom: "1px solid rgba(0,0,0,0.10)",
-                            boxShadow: "none",
-                            outline: "none",
-                            background: "#fff",
-                            transition: "border-color 0.2s"
+                            padding: "8px 42px 8px 0px",
                           }}
                           value={commentText}
-                          onChange={e => {
+                          onChange={(e) => {
                             setCommentText(e.target.value);
                             if (!showCommentActions) setShowCommentActions(true);
                           }}
                           placeholder="Escribe un comentario..."
                           maxLength={200}
-                          onFocus={e => {
-                            e.currentTarget.style.borderBottom = "1px solid rgba(230,57,70,0.18)";
-                            setShowCommentActions(true);
-                          }}
-                          onBlur={e => {
-                            e.currentTarget.style.borderBottom = "1px solid rgba(0,0,0,0.10)";
-                          }}
-                          onKeyDown={e => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                              // Evita enviar el formulario con Enter
+                          onFocus={() => setShowCommentActions(true)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) {
                               e.preventDefault();
-                              setCommentText(prev => prev + '\n');
+                              setCommentText((prev) => prev + "\n");
                             }
                           }}
                         />
                         {showEmojiPicker && (
-                          <div
-                            ref={emojiPickerRef}
-                            style={{
-                              position: "absolute",
-                              left: 0,
-                              top: "calc(100% + 6px)",
-                              zIndex: 99,
-                              background: "#fff",
-                              border: "1px solid #eee",
-                              boxShadow: "0 4px 16px 0 rgba(0,0,0,0.10)",
-                              borderRadius: "0.7rem",
-                              padding: "8px 10px 6px 10px",
-                              minWidth: "220px",
-                              maxWidth: "320px",
-                              display: "flex",
-                              flexWrap: "wrap",
-                              gap: "6px 8px",
-                              maxHeight: "180px",
-                              overflowY: "auto"
-                            }}
-                          >
+                          <div ref={emojiPickerRef} className="product-comment-emoji-picker">
                             {emojiList.map((emoji) => (
                               <span
                                 key={emoji}
-                                style={{ fontSize: "1.35rem", cursor: "pointer", transition: "transform 0.1s", borderRadius: "6px", padding: "2px 4px" }}
-                                onMouseDown={e => e.preventDefault()}
+                                className="product-comment-emoji"
+                                onMouseDown={(e) => e.preventDefault()}
                                 onClick={() => {
-                                  setCommentText(prev => prev + emoji);
+                                  setCommentText((prev) => prev + emoji);
                                 }}
-                                onMouseOver={e => e.currentTarget.style.background = "#f7f7f7"}
-                                onMouseOut={e => e.currentTarget.style.background = "transparent"}
-                              >{emoji}</span>
+                              >
+                                {emoji}
+                              </span>
                             ))}
                           </div>
                         )}
                         {showCommentActions && (
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "12px", marginBottom: "8px" }}>
-                            <div>
-                              <button
-                                type="button"
-                                ref={emojiButtonRef}
-                                style={{
-                                  background: "none",
-                                  border: "none",
-                                  cursor: "pointer",
-                                  fontSize: "1.3rem",
-                                  color: "#888"
-                                }}
-                                title="Agregar emoji"
-                                onClick={() => setShowEmojiPicker(prev => !prev)}
-                                tabIndex={0}
-                              >
-                                😊
-                              </button>
-                            </div>
-                            <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+                          <div className="product-comment-actions">
+                            <button
+                              type="button"
+                              ref={emojiButtonRef}
+                              className="product-comment-emoji-trigger"
+                              title="Agregar emoji"
+                              onClick={() => setShowEmojiPicker((prev) => !prev)}
+                            >
+                              😊
+                            </button>
+                            <div className="product-comment-actions-buttons">
                               <Button
                                 type="button"
-                                className="btn-cosmetic-primary"
-                                style={{ borderRadius: "1.5rem", fontWeight: 500, color: "#333", background: "#f7f7f7", border: "none", boxShadow: "none", padding: "4px 18px" }}
+                                variant="link"
+                                className="product-comments-action"
                                 onClick={() => {
                                   setCommentText("");
                                   setShowCommentActions(false);
                                   setShowEmojiPicker(false);
                                 }}
-                              >Cancelar</Button>
+                              >
+                                Cancelar
+                              </Button>
                               <Button
                                 type="submit"
-                                className="btn-cosmetic-primary"
-                                style={{ borderRadius: "1.5rem", fontWeight: 500, border: "none", boxShadow: "none", color: "#fff", padding: "4px 18px", display: "flex", alignItems: "center", gap: "6px" }}
+                                className="btn-cosmetic-primary d-inline-flex align-items-center gap-2"
                                 disabled={!commentText.trim()}
                               >
-                                <i className="bi bi-chat-left-text" style={{ fontSize: "1.1rem", marginRight: 4 }}></i>
+                                <i className="bi bi-chat-left-text" style={{ fontSize: "1.05rem" }}></i>
                                 Comentar
                               </Button>
                             </div>
                           </div>
                         )}
                       </div>
-                      {/* Solo mostrar el error de calificación aquí debajo del comentario */}
-                      {errorMessage === 'Por favor selecciona una calificación antes de comentar' && (
+                      {errorMessage === "Por favor selecciona una calificación antes de comentar" && (
                         <div className="text-danger mt-2" style={{ fontSize: "0.95rem" }}>
                           {errorMessage}
                         </div>
                       )}
                     </Form.Group>
                   </div>
-                  {/* Botón de comentar eliminado, solo se usan los botones dentro de las acciones debajo del campo */}
                 </Col>
               </Row>
             </Form>
           ) : (
-            <div className="mb-4 p-3 rounded shadow-sm bg-cosmetic-secondary text-center">
-              <p className="mb-3">
+            <div className="mb-4 p-3 rounded shadow-sm product-comment-form text-center">
+              <p className="mb-3 product-comment-text">
                 Inicia sesión para dejar un comentario sobre este producto.
               </p>
-              <Button
-                as={Link}
-                href="/auth/login"
-                className="btn-cosmetic-primary rounded-1"
-              >
+              <Button as={Link} href="/auth/login" className="btn-cosmetic-primary rounded-1">
                 Inicia sesión para comentar
               </Button>
             </div>
           )}
 
-          {/* Lista de comentarios */}
           {loadingComments ? (
-            <div className="text-center text-muted py-4">
+            <div className="text-center py-4 product-comments-feedback">
               <span className="spinner-border spinner-border-sm me-2"></span>
               Cargando comentarios...
             </div>
           ) : comments.length === 0 ? (
-            <div className="text-center text-muted py-4">
+            <div className="text-center py-4 product-comments-feedback">
               Aún no hay comentarios para este producto.
             </div>
           ) : (
             <div className="d-flex flex-column gap-3">
               {comments.slice(0, commentsToShow).map((c, idx) => (
-                <div
-                  key={idx}
-                  className="w-100"
-                  style={{
-                    maxWidth: "100%",
-                    background: "#fff",
-                    minHeight: "60px",
-                    borderRadius: 0,
-                    border: "none",
-                    boxShadow: "0 2px 8px -4px rgba(0,0,0,0.07)",
-                    borderLeft: "3px solid #e0e0e0",
-                    marginBottom: "18px",
-                    padding: "18px 0 8px 0"
-                  }}
-                >
-                  <div className="d-flex align-items-start gap-3">
-                    <div
-                      style={{
-                        width: "40px",
-                        height: "40px",
-                        borderRadius: "50%",
-                        overflow: "hidden",
-                        border: "1px solid #eee",
-                        margin: "0 auto",
-                        background: "#f7f7f7"
-                      }}
-                    >
-                      <Image
-                        src={c.photoURL || "/new_user.png"}
-                        alt={c.name}
-                        width={40}
-                        height={40}
-                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                      />
+                <div key={idx} className="product-comment-card">
+                  <div className="product-comment-avatar">
+                    <Image
+                      src={c.photoURL || "/new_user.png"}
+                      alt={c.name}
+                      width={40}
+                      height={40}
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                    />
+                  </div>
+                  <div className="flex-grow-1">
+                    <div className="product-comment-meta">
+                      <span className="product-comment-author">{c.name}</span>
+                      <span
+                        className="product-comment-stars"
+                        aria-label={`Calificación de ${c.rating} sobre 5`}
+                      >
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <span
+                            key={star}
+                            className={`rating-static-star ${star <= c.rating ? "is-active" : ""}`}
+                          >
+                            ★
+                          </span>
+                        ))}
+                      </span>
+                      <span className="product-comment-date">
+                        {new Date(c.date).toLocaleString()}
+                      </span>
                     </div>
-                    <div className="flex-grow-1">
-                      <div className="d-flex align-items-center gap-2">
-                        <span className="fw-bold" style={{ fontSize: "1rem" }}>{c.name}</span>
-                        <span style={{ color: "#e63946", fontSize: "1rem" }}>
-                          {[1, 2, 3, 4, 5].map((star) => (
-                            <span key={star} style={{ filter: star > c.rating ? "grayscale(1)" : "none" }}>
-                              ★
-                            </span>
-                          ))}
-                        </span>
-                        <span className="small text-muted ms-2">{new Date(c.date).toLocaleString()}</span>
-                      </div>
-                      <p className="mt-1 mb-1" style={{ fontSize: "0.98rem", lineHeight: "1.3", wordBreak: "break-word", boxShadow: "0 2px 8px -4px rgba(0,0,0,0.07)", marginBottom: "8px" }}>{c.text}</p>
+                    <p className="product-comment-text">{c.text}</p>
 
-                      {/* Respuestas estilo YouTube */}
-                      {c.replies && c.replies.length > 0 && (
-                        <div className="mt-1 ps-3" style={{ borderLeft: "2px solid #e0e0e0" }}>
-                          {c.replies.slice(0, repliesToShow[idx] || INITIAL_REPLIES_TO_SHOW).map((r: any, i: number) => (
-                            <div key={i} className="mb-1 d-flex align-items-start gap-2" style={{ borderRadius: 0, border: "none", boxShadow: "0 2px 8px -4px rgba(0,0,0,0.07)", borderLeft: "2px solid #e0e0e0", background: "#fff" }}>
-                              <div style={{ width: "28px", height: "28px", borderRadius: "50%", overflow: "hidden", border: "1px solid #eee", background: "#f7f7f7" }}>
-                                <Image src={r.photoURL || "/new_user.png"} alt={r.name} width={28} height={28} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    {c.replies && c.replies.length > 0 && (
+                      <div className="product-comment-replies">
+                        {c.replies
+                          .slice(0, repliesToShow[idx] || INITIAL_REPLIES_TO_SHOW)
+                          .map((r: any, i: number) => (
+                            <div key={i} className="product-comment-reply-card">
+                              <div className="product-comment-reply-avatar">
+                                <Image
+                                  src={r.photoURL || "/new_user.png"}
+                                  alt={r.name}
+                                  width={28}
+                                  height={28}
+                                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                                />
                               </div>
                               <div>
-                                <span className="fw-bold" style={{ fontSize: "0.95rem" }}>{r.name}</span>
-                                <span className="small text-muted ms-2">{new Date(r.date).toLocaleString()}</span>
-                                <p className="mb-1" style={{ fontSize: "0.95rem", lineHeight: "1.3", wordBreak: "break-word", boxShadow: "0 2px 8px -4px rgba(0,0,0,0.07)", marginBottom: "8px" }}>{r.text}</p>
+                                <div className="product-comment-reply-meta">
+                                  <span className="product-comment-author">{r.name}</span>
+                                  <span className="product-comment-date">
+                                    {new Date(r.date).toLocaleString()}
+                                  </span>
+                                </div>
+                                <p className="product-comment-reply-text">{r.text}</p>
                               </div>
                             </div>
                           ))}
-                          {c.replies.length > (repliesToShow[idx] || INITIAL_REPLIES_TO_SHOW) && (
-                            <Button className="p-0 text-cosmetic-primary" style={{ fontSize: "0.92rem", background: "none", border: "none" }} onClick={() => handleShowMoreReplies(idx, c.replies.length)}>
-                              Ver más respuestas ({c.replies.length - (repliesToShow[idx] || INITIAL_REPLIES_TO_SHOW)})
-                            </Button>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Botón para mostrar campo de respuesta */}
-                      <div className="mt-2">
-                        <Button
-                          size="sm"
-                          className="p-0 text-cosmetic-primary"
-                          style={{ fontSize: "0.95rem", background: "none", border: "none" }}
-                          onClick={() => setReplyText((prev) => ({ ...prev, [idx]: prev[idx] === undefined ? "" : undefined }))}
-                        >
-                          Responder
-                        </Button>
-                      </div>
-
-                      {/* Formulario de respuesta solo si está activo */}
-                      {replyText[idx] !== undefined && (
-                        <div style={{ position: "relative" }}>
-                          <Form
-                            className="mt-1"
-                            onSubmit={(e) => {
-                              e.preventDefault();
-                              handleReply(idx);
-                            }}
+                        {c.replies.length > (repliesToShow[idx] || INITIAL_REPLIES_TO_SHOW) && (
+                          <Button
+                            variant="link"
+                            className="product-comments-action"
+                            onClick={() => handleShowMoreReplies(idx, c.replies.length)}
                           >
-                            <Form.Control
-                              className="mb-1 youtube-input"
-                              style={{
-                                minHeight: "32px",
-                                maxHeight: "80px",
-                                fontSize: "0.98rem",
-                                resize: "vertical",
-                                padding: "6px 36px 6px 0px",
-                                border: "none",
-                                borderRadius: "0px",
-                                borderBottom: "1px solid rgba(0,0,0,0.10)",
-                                boxShadow: "0 2px 6px -2px rgba(0,0,0,0.08)",
-                                outline: "none",
-                                background: "#fff",
-                                transition: "border-color 0.2s"
-                              }}
-                              value={replyText[idx] || ""}
-                              onChange={(e) => setReplyText((prev) => ({ ...prev, [idx]: e.target.value }))}
-                              placeholder="Responder..."
-                              onFocus={e => {
-                                e.currentTarget.style.borderBottom = "1px solid rgba(230,57,70,0.18)";
-                                if (!replyEmojiState[idx]?.button) {
-                                  setReplyEmojiState(prev => ({ ...prev, [idx]: { button: true, picker: false } }));
-                                }
-                              }}
-                              onKeyDown={e => {
-                                if (e.key === 'Enter' && !e.shiftKey) {
-                                  e.preventDefault();
-                                  setReplyText(prev => ({ ...prev, [idx]: (prev[idx] || "") + '\n' }));
-                                }
-                              }}
-                            />
-                            {replyEmojiState[idx]?.button && (
-                              <button
-                                type="button"
-                                ref={el => { replyEmojiButtonRefs.current[idx] = el; }}
-                                style={{
-                                  position: "absolute",
-                                  right: 4,
-                                  bottom: 8,
-                                  background: "none",
-                                  border: "none",
-                                  cursor: "pointer",
-                                  fontSize: "1.2rem",
-                                  color: "#888"
-                                }}
-                                title="Agregar emoji"
-                                onClick={() => setReplyEmojiState(prev => ({ ...prev, [idx]: { ...prev[idx], picker: !prev[idx]?.picker } }))}
-                                tabIndex={0}
-                              >
-                                😊
-                              </button>
-                            )}
-                            {replyEmojiState[idx]?.picker && (
-                              <div
-                                ref={el => { replyEmojiPickerRefs.current[idx] = el; }}
-                                style={{
-                                  position: "absolute",
-                                  left: "auto",
-                                  right: 0,
-                                  top: "calc(100% + 6px)",
-                                  zIndex: 99,
-                                  background: "#fff",
-                                  border: "1px solid #eee",
-                                  boxShadow: "0 4px 16px 0 rgba(0,0,0,0.10)",
-                                  borderRadius: "0.7rem",
-                                  padding: "8px 10px 6px 10px",
-                                  minWidth: "220px",
-                                  maxWidth: "320px",
-                                  display: "flex",
-                                  flexWrap: "wrap",
-                                  gap: "6px 8px",
-                                  maxHeight: "180px",
-                                  overflowY: "auto"
-                                }}
-                              >
-                                {emojiList.map((emoji) => (
-                                  <span
-                                    key={emoji}
-                                    style={{ fontSize: "1.25rem", cursor: "pointer", transition: "transform 0.1s", borderRadius: "6px", padding: "2px 4px" }}
-                                    onMouseDown={e => e.preventDefault()}
-                                    onClick={() => {
-                                      setReplyText(prev => ({ ...prev, [idx]: (prev[idx] || "") + emoji }));
-                                    }}
-                                    onMouseOver={e => e.currentTarget.style.background = "#f7f7f7"}
-                                    onMouseOut={e => e.currentTarget.style.background = "transparent"}
-                                  >{emoji}</span>
-                                ))}
-                              </div>
-                            )}
-                            <Button size="sm" className="btn-cosmetic-primary" type="submit" style={{ height: "32px", fontSize: "0.95rem", alignSelf: "flex-end", boxShadow: "none", fontWeight: 500, transition: "background 0.2s" }}
-                              onMouseOver={e => e.currentTarget.style.background = '#d62839'}
-                              onMouseOut={e => e.currentTarget.style.background = '#e63946'}
-                            >
-                              <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-                                <i className="bi bi-reply" style={{ fontSize: "1rem", marginRight: 3 }}></i>
-                                Responder
-                              </span>
-                            </Button>
-                          </Form>
-                        </div>
-                      )}
+                            Ver más respuestas ({c.replies.length - (repliesToShow[idx] || INITIAL_REPLIES_TO_SHOW)})
+                          </Button>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="mt-2">
+                      <Button
+                        size="sm"
+                        variant="link"
+                        className="product-comments-action"
+                        onClick={() =>
+                          setReplyText((prev) => ({
+                            ...prev,
+                            [idx]: prev[idx] === undefined ? "" : undefined,
+                          }))
+                        }
+                      >
+                        Responder
+                      </Button>
                     </div>
+
+                    {replyText[idx] !== undefined && (
+                      <div style={{ position: "relative" }}>
+                        <Form
+                          className="mt-2 product-comment-reply-form"
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            handleReply(idx);
+                          }}
+                        >
+                          <Form.Control
+                            className="mb-2 youtube-input"
+                            style={{
+                              minHeight: "32px",
+                              maxHeight: "80px",
+                              fontSize: "0.98rem",
+                              resize: "vertical",
+                              padding: "6px 42px 6px 0px",
+                            }}
+                            value={replyText[idx] || ""}
+                            onChange={(e) =>
+                              setReplyText((prev) => ({ ...prev, [idx]: e.target.value }))
+                            }
+                            placeholder="Responder..."
+                            onFocus={() => {
+                              if (!replyEmojiState[idx]?.button) {
+                                setReplyEmojiState((prev) => ({
+                                  ...prev,
+                                  [idx]: { button: true, picker: false },
+                                }));
+                              }
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && !e.shiftKey) {
+                                e.preventDefault();
+                                setReplyText((prev) => ({
+                                  ...prev,
+                                  [idx]: (prev[idx] || "") + "\n",
+                                }));
+                              }
+                            }}
+                          />
+                          {replyEmojiState[idx]?.button && (
+                            <button
+                              type="button"
+                              ref={(el) => {
+                                replyEmojiButtonRefs.current[idx] = el;
+                              }}
+                              className="product-comment-emoji-trigger product-comment-reply-emoji"
+                              title="Agregar emoji"
+                              onClick={() =>
+                                setReplyEmojiState((prev) => ({
+                                  ...prev,
+                                  [idx]: { ...prev[idx], picker: !prev[idx]?.picker },
+                                }))
+                              }
+                            >
+                              😊
+                            </button>
+                          )}
+                          {replyEmojiState[idx]?.picker && (
+                            <div
+                              ref={(el) => {
+                                replyEmojiPickerRefs.current[idx] = el;
+                              }}
+                              className="product-comment-emoji-picker product-comment-reply-picker"
+                            >
+                              {emojiList.map((emoji) => (
+                                <span
+                                  key={emoji}
+                                  className="product-comment-emoji"
+                                  onMouseDown={(e) => e.preventDefault()}
+                                  onClick={() => {
+                                    setReplyText((prev) => ({
+                                      ...prev,
+                                      [idx]: (prev[idx] || "") + emoji,
+                                    }));
+                                  }}
+                                >
+                                  {emoji}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          <Button
+                            size="sm"
+                            type="submit"
+                            className="btn-cosmetic-primary d-inline-flex align-items-center gap-2 product-comment-reply-submit"
+                          >
+                            <i className="bi bi-reply" style={{ fontSize: "1rem" }}></i>
+                            Responder
+                          </Button>
+                        </Form>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
               {comments.length > commentsToShow && (
                 <div className="text-center mt-3">
-                  <Button className="p-0 text-cosmetic-primary" style={{ fontSize: "1rem", background: "none", border: "none" }} onClick={handleShowMoreComments}>
+                  <Button
+                    variant="link"
+                    className="product-comments-action"
+                    onClick={handleShowMoreComments}
+                  >
                     Ver más comentarios ({comments.length - commentsToShow})
                   </Button>
                 </div>

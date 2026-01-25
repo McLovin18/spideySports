@@ -397,7 +397,7 @@ export default function InventoryManagementPage() {
                                       alt={product.name}
                                       width="40" 
                                       height="40" 
-                                      className="rounded me-2"
+                                      className="rounded me-2 inventory-image"
                                       style={{ objectFit: 'cover' }}
                                     />
                                   )}
@@ -502,7 +502,7 @@ export default function InventoryManagementPage() {
                         alt={selectedProduct.name}
                         width="50"
                         height="50"
-                        className="rounded me-3"
+                        className="rounded me-3 inventory-image"
                         style={{ objectFit: 'cover' }}
                       />
                     )}
