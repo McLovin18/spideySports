@@ -50,6 +50,7 @@ export interface ProductInventory {
   versions?: JerseyVersion[];
   defaultVersionId?: string;
   sizeStocks?: SizeStock[];
+  featured?: boolean; // Producto destacado para mostrar en la página de inicio
 }
 
 const normalizeSizeStocks = (data?: SizeStock[]): SizeStock[] => {
@@ -770,6 +771,117 @@ class InventoryService {
     } catch (error) {
       console.error('❌ Error procesando orden:', error);
       throw error; // Re-lanzar para que purchaseService lo maneje
+    }
+  }
+
+  // ✅ Actualizar estado de producto destacado
+  async updateFeaturedStatus(productId: number, featured: boolean): Promise<void> {
+    try {
+      // Primero verificamos si el producto existe en el inventario
+      const inventoryDocRef = doc(db, this.collectionName, productId.toString());
+      const inventoryDocSnap = await getDoc(inventoryDocRef);
+      
+      if (!inventoryDocSnap.exists()) {
+        throw new Error(`Producto ${productId} no encontrado en el inventario`);
+      }
+
+      const inventoryProduct = hydrateProductFromFirestore(inventoryDocSnap.data(), productId);
+
+      // ⭐ PASO 1: Actualizar el campo featured en el inventario
+      await updateDoc(inventoryDocRef, {
+        featured: featured,
+        lastUpdated: new Date().toISOString()
+      });
+
+      // ⭐ PASO 2: Actualizar o crear en la colección products
+      const productsDocRef = doc(db, 'products', productId.toString());
+      const productsDocSnap = await getDoc(productsDocRef);
+      
+      if (productsDocSnap.exists()) {
+        // El documento existe, solo actualizamos el campo featured
+        await updateDoc(productsDocRef, {
+          featured: featured,
+          lastUpdated: new Date().toISOString()
+        });
+      } else {
+        // El documento no existe, lo creamos con los datos básicos del inventario
+        // Filtramos campos undefined para evitar errores de Firebase
+        const productData: any = {
+          productId: inventoryProduct.productId,
+          name: inventoryProduct.name,
+          price: inventoryProduct.price,
+          featured: featured,
+          isActive: true, // ⭐ Añadir isActive para getFeaturedProducts
+          lastUpdated: new Date().toISOString(),
+          createdAt: new Date().toISOString()
+        };
+
+        // Solo añadir campos que no sean undefined
+        if (inventoryProduct.category !== undefined) {
+          productData.category = inventoryProduct.category;
+        }
+        
+        if (inventoryProduct.league !== undefined) {
+          productData.league = inventoryProduct.league;
+        }
+
+        if (inventoryProduct.images && Array.isArray(inventoryProduct.images)) {
+          productData.images = inventoryProduct.images;
+        } else {
+          productData.images = [];
+        }
+
+        await setDoc(productsDocRef, productData);
+      }
+
+      console.log(`✅ Producto ${productId} ${featured ? 'marcado como destacado' : 'removido de destacados'}`);
+      
+    } catch (error) {
+      console.error('❌ Error actualizando estado destacado:', error);
+      throw error;
+    }
+  }
+
+  // ✅ Obtener productos destacados
+  async getFeaturedProducts(): Promise<ProductInventory[]> {
+    try {
+      const q = query(
+        collection(db, 'products'),
+        where('featured', '==', true),
+        where('isActive', '==', true)
+      );
+      
+      const snapshot = await getDocs(q);
+      const products: ProductInventory[] = [];
+      
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data() as Partial<ProductInventory>;
+        if (data.productId && data.name) {
+          products.push({
+            productId: data.productId,
+            name: data.name || 'Sin nombre',
+            stock: data.stock ?? 0,
+            price: data.price ?? 0,
+            images: data.images || [],
+            category: data.category,
+            subcategory: data.subcategory,
+            isActive: data.isActive ?? true,
+            lastUpdated: data.lastUpdated || new Date().toISOString(),
+            description: data.description,
+            details: data.details,
+            versions: data.versions,
+            defaultVersionId: data.defaultVersionId,
+            sizeStocks: data.sizeStocks ? normalizeSizeStocks(data.sizeStocks) : undefined,
+            featured: data.featured ?? false
+          });
+        }
+      });
+      
+      return products.sort((a, b) => new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime());
+      
+    } catch (error) {
+      console.error('❌ Error obteniendo productos destacados:', error);
+      throw error;
     }
   }
 }

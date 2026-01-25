@@ -5,6 +5,7 @@ import { Container, Row, Col, Card, Table, Button, Badge, Form, Modal, Alert, In
 import { useAuth } from '../../context/AuthContext';
 import { useRole } from '../../context/adminContext';
 import { inventoryService, type ProductInventory } from '../../services/inventoryService';
+import { invalidateProductsCache } from '../../hooks/useProducts';
 import NavbarComponent from '../../components/Navbar';
 import Sidebar from '../../components/Sidebar';
 import TopbarMobile from '../../components/TopbarMobile';
@@ -165,6 +166,27 @@ export default function InventoryManagementPage() {
       }
     } catch (error) {
       setMessage({type: 'error', text: 'Error al procesar la acción'});
+    }
+  };
+
+  // ⭐ Función para cambiar estado de producto destacado
+  const handleFeaturedToggle = async (productId: number, currentFeatured: boolean) => {
+    try {
+      const newFeaturedState = !currentFeatured;
+      await inventoryService.updateFeaturedStatus(productId, newFeaturedState);
+      
+      // ⭐ Invalidar cache para reflejar cambios en homepage
+      invalidateProductsCache();
+      
+      setMessage({
+        type: 'success', 
+        text: `Producto ${newFeaturedState ? 'marcado como destacado' : 'removido de destacados'}`
+      });
+      
+      await loadProducts(); // Recargar productos para reflejar cambios
+    } catch (error) {
+      console.error('Error cambiando estado destacado:', error);
+      setMessage({type: 'error', text: 'Error al actualizar estado destacado'});
     }
   };
 
@@ -381,6 +403,7 @@ export default function InventoryManagementPage() {
                             <th>Producto</th>
                             <th>Precio</th>
                             <th>Stock</th>
+                            <th>Destacado</th>
                             <th>Última Act.</th>
                             <th>Acciones</th>
                           </tr>
@@ -414,6 +437,37 @@ export default function InventoryManagementPage() {
                                 <Badge bg={getStockBadgeVariant(product.stock)}>
                                   {product.stock} unidades
                                 </Badge>
+                              </td>
+                              <td className="text-center">
+                                {/* ⭐ Checkbox para destacar producto */}
+                                <div 
+                                  className={`featured-checkbox ${product.featured ? 'checked' : ''}`}
+                                  onClick={() => handleFeaturedToggle(product.productId, product.featured || false)}
+                                  title={product.featured ? 'Click para remover de destacados' : 'Click para destacar producto'}
+                                  style={{
+                                    cursor: 'pointer',
+                                    width: '24px',
+                                    height: '24px',
+                                    border: '2px solid #e63946',
+                                    borderRadius: '4px',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    backgroundColor: product.featured ? '#e63946' : 'transparent',
+                                    transition: 'all 0.3s ease'
+                                  }}
+                                >
+                                  {product.featured && (
+                                    <i 
+                                      className="bi bi-check" 
+                                      style={{ 
+                                        color: 'white', 
+                                        fontSize: '14px', 
+                                        fontWeight: 'bold' 
+                                      }}
+                                    />
+                                  )}
+                                </div>
                               </td>
                               <td>
                                 <small className="text-muted">
@@ -461,7 +515,7 @@ export default function InventoryManagementPage() {
                           ))}
                           {filteredProducts.length === 0 && (
                             <tr>
-                              <td colSpan={6} className="text-center py-4">
+                              <td colSpan={7} className="text-center py-4">
                                 <i className="bi bi-inbox" style={{ fontSize: '3rem', color: 'var(--cosmetic-tertiary-light)' }}></i>
                                 <p className="text-muted mt-2 mb-0">
                                   {searchTerm || filterStock !== 'all' 

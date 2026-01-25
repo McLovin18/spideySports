@@ -8,6 +8,13 @@ let inventoryCache: any[] | null = null;
 let cacheTimestamp = 0;
 const CACHE_DURATION = 30000; // 30 segundos
 
+// ⭐ Función para invalidar cache (útil después de actualizaciones)
+export const invalidateProductsCache = () => {
+  inventoryCache = null;
+  cacheTimestamp = 0;
+  console.log('🔄 Cache de productos invalidado');
+};
+
 const resolveProductImages = (product: any): string[] => {
   const versions = Array.isArray(product?.versions) ? product.versions : [];
   const defaultVersionId = product?.defaultVersionId || versions[0]?.id || null;
@@ -76,7 +83,7 @@ export const useProducts = (categoryFilter?: string) => {
       defaultVersionId,
       colors: versions.length > 0 ? versions.map((v: any) => v.label ?? 'Versión') : ['Versión única'],
       details: inventoryProduct.details || [],
-      featured: false, // Los productos del inventario no son featured por defecto
+      featured: inventoryProduct.featured || false, // ⭐ Leer estado featured desde Firebase
       isFromFirebase: true // Marcar que viene de Firebase
     };
   };
@@ -176,6 +183,7 @@ export const useProducts = (categoryFilter?: string) => {
                       quantity: size.quantity ?? 0,
                     }))
                   : (staticProduct as any).sizeOptions || [],
+                featured: firebaseData.featured || staticProduct.featured || false, // ⭐ Incluir estado featured
                 isFromFirebase: false // Es producto estático enriquecido con datos de Firebase
               });
             }
@@ -186,6 +194,7 @@ export const useProducts = (categoryFilter?: string) => {
                 ...staticProduct,
                 inStock: true,
                 stockQuantity: 999, // Valor por defecto para productos estáticos sin inventario Firebase
+                featured: staticProduct.featured || false, // ⭐ Mantener estado featured original
                 isFromFirebase: false
               });
             }

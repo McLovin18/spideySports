@@ -48,6 +48,27 @@ input:valid, textarea:valid, select:valid, .form-control:valid
   background-color: transparent !important;
 }
 
+/* ⭐ Estilos para checkbox de productos destacados */
+.featured-checkbox {
+  position: relative;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  user-select: none;
+}
+
+.featured-checkbox:hover {
+  box-shadow: 0 4px 8px rgba(230, 57, 70, 0.3);
+  transform: translateY(-1px);
+}
+
+.featured-checkbox.checked {
+  box-shadow: 0 4px 8px rgba(230, 57, 70, 0.4);
+}
+
+.featured-checkbox:active {
+  transform: translateY(0);
+  transition: transform 0.1s ease;
+}
+
 .table img,
 .inventory-image,
 .product-image {
