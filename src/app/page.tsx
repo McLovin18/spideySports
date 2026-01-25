@@ -36,7 +36,7 @@ export default function Home() {
   const heroSlides = [
     {
       id: 'club-kits',
-      src: '/hero-club-kits.svg',
+      src: '/teams.jpeg',
       alt: 'Camisetas oficiales de clubes europeos',
       badge: 'Colección 24/25',
       titulo: 'Vístete como tu club',

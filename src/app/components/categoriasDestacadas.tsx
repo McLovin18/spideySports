@@ -46,7 +46,7 @@ const categories: Category[] = [
     background: "linear-gradient(135deg, rgba(3,24,27,0.92) 0%, rgba(3,123,144,0.32) 100%)",
     accent: "#037b90",
     icon: "bi-shield-fill",
-    image: "/hero-club-kits.svg",
+    image: "/teams.jpeg",
     imageAlt: "Camisas de clubes europeos"
   },
   {
@@ -81,29 +81,7 @@ const categories: Category[] = [
     icon: "bi-rewind-fill",
     image: "/hero-retro-legends.svg",
     imageAlt: "Camiseta retro legendaria"
-  },
-  {
-    id: 5,
-    title: "Ediciones Limitadas",
-    subtitle: "Colaboraciones y lifestyle",
-    link: "/categories/collabs",
-    background: "linear-gradient(135deg, rgba(3,24,27,0.92) 0%, rgba(3,123,144,0.24) 60%, rgba(144,0,0,0.34) 100%)",
-    accent: "#037b90",
-    icon: "bi-stars",
-    image: "/hero-limited-collabs.svg",
-    imageAlt: "Jersey de colaboración limitada"
-  },
-  {
-    id: 6,
-    title: "Históricas Campeonas",
-    subtitle: "Selecciones legendarias",
-    link: "/categories/legendary",
-    background: "linear-gradient(135deg, rgba(3,24,27,0.92) 0%, rgba(247,208,96,0.32) 100%)",
-    accent: "#f7d060",
-    icon: "bi-trophy-fill",
-    image: "/hero-legendary-champions.svg",
-    imageAlt: "Trofeo y camisetas de selecciones campeonas"
-  },
+  }
 ];
 
 const FeaturedCategories = () => {
