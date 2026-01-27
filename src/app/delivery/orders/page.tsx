@@ -7,22 +7,15 @@ import { useRole } from '../../context/adminContext';
 import { ProtectedRoute } from '../../utils/securityMiddleware';
 import LoginRequired from '../../components/LoginRequired';
 import DeliveryNotificationPanel from '../../components/DeliveryNotificationPanel';
+import { 
+  getDeliveryOrders, 
+  selfAssignUrgentOrder,
+  DeliveryOrder 
+} from '../../services/deliveryService';
 import { db } from '../../utils/firebase';
 import { collection, query, where, getDocs, updateDoc, doc, getDoc } from 'firebase/firestore';
 
-interface DeliveryOrder {
-  id: string;
-  userId: string;
-  userName: string;
-  userEmail: string;
-  date: string;
-  items: any[];
-  total: number;
-  status: 'assigned' | 'picked_up' | 'in_transit' | 'delivered';
-  assignedTo: string; // Email del delivery
-  assignedAt: string;
-  deliveryNotes?: string;
-}
+// Usar la interfaz del servicio que ya incluye las propiedades de emergencia
 
 const DeliveryOrdersPage = () => {
   const { user } = useAuth();
@@ -45,33 +38,15 @@ const DeliveryOrdersPage = () => {
     
     setLoading(true);
     try {
-      // Buscar pedidos asignados a este repartidor
-      const ordersQuery = query(
-        collection(db, 'deliveryOrders'),
-        where('assignedTo', '==', user.email)
-      );
-      
-      const querySnapshot = await getDocs(ordersQuery);
-      const deliveryOrders: DeliveryOrder[] = [];
-      
-      querySnapshot.forEach((doc) => {
-        deliveryOrders.push({
-          id: doc.id,
-          ...doc.data()
-        } as DeliveryOrder);
-      });
-      
-      // Ordenar por fecha (más recientes primero)
-      deliveryOrders.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      
+      // Usar el servicio que incluye órdenes asignadas + urgentes disponibles
+      const deliveryOrders = await getDeliveryOrders(user.email);
       setOrders(deliveryOrders);
     } catch (error) {
-      console.error('Error loading deliveries:', error);
+      console.error('Error cargando pedidos:', error);
     } finally {
       setLoading(false);
     }
   };
-
 
   const formatOrderDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -150,6 +125,27 @@ const DeliveryOrdersPage = () => {
     }
   };
 
+  // 🚨 Función para auto-asignarse a órdenes urgentes
+  const handleSelfAssignUrgentOrder = async (order: DeliveryOrder) => {
+    if (!user?.email) return;
+
+    try {
+      const orderIdToUse = order.orderId || order.id;
+      
+      await selfAssignUrgentOrder(orderIdToUse, user.email);
+      
+      // Recargar pedidos para reflejar el cambio
+      await loadMyDeliveries();
+      
+      alert('🚨 ¡Te has asignado exitosamente esta orden urgente!');
+      
+    } catch (error: any) {
+      console.error('Error auto-asignando orden urgente:', error);
+      const errorMessage = error?.message || 'Error desconocido';
+      alert(`❌ Error: ${errorMessage}`);
+    }
+  };
+
   // 🎯 FUNCIÓN PARA OBTENER ZONAS DE DELIVERY
   const getDeliveryZones = (email: string): string[] => {
     // Mapear emails a sus zonas preferidas
@@ -219,6 +215,35 @@ const DeliveryOrdersPage = () => {
               </Col>
             </Row>
 
+            {/* 🚨 Panel de Órdenes Urgentes Disponibles */}
+            {orders.filter(order => order.isEmergency && order.status !== 'delivered' && !order.assignedTo).length > 0 && (
+              <Row className="mb-4">
+                <Col>
+                  <Alert variant="danger" className="shadow-sm">
+                    <Alert.Heading className="h6">
+                      🚨 PEDIDOS URGENTES DISPONIBLES
+                    </Alert.Heading>
+                    <p className="mb-2">
+                      Hay <strong>{orders.filter(order => order.isEmergency && order.status !== 'delivered' && !order.assignedTo).length}</strong> pedidos 
+                      marcados como urgentes que cualquier repartidor puede tomar.
+                    </p>
+                    <div className="d-flex flex-wrap gap-2">
+                      {orders.filter(order => order.isEmergency && order.status !== 'delivered' && !order.assignedTo).map(order => (
+                        <Button 
+                          key={order.id}
+                          variant="outline-danger" 
+                          size="sm"
+                          onClick={() => handleSelfAssignUrgentOrder(order)}
+                        >
+                          {order.userName} - ${order.total.toFixed(2)} 🚨
+                        </Button>
+                      ))}
+                    </div>
+                  </Alert>
+                </Col>
+              </Row>
+            )}
+
             {orders.length === 0 ? (
               <div className="text-center py-5">
                 <div className="bg-light rounded-circle d-inline-flex align-items-center justify-content-center mb-3" 
@@ -242,19 +267,39 @@ const DeliveryOrdersPage = () => {
                 {/* Vista de cards para móvil - Mejorado */}
                 <div className="d-md-none">
                   {orders.map((order) => (
-                    <Card key={order.id} className="mb-3 shadow-sm border-0" style={{ borderRadius: '1rem' }}>
-                      <Card.Header className="py-3 bg-light" style={{ borderRadius: '1rem 1rem 0 0' }}>
+                    <Card 
+                      key={order.id} 
+                      className={`mb-3 shadow-sm border-0 ${order.isEmergency && order.status !== 'delivered' ? 'border-danger' : ''}`} 
+                      style={{ 
+                        borderRadius: '1rem',
+                        backgroundColor: order.isEmergency && order.status !== 'delivered' ? '#fff5f5' : 'white',
+                        border: order.isEmergency && order.status !== 'delivered' ? '2px solid #dc3545' : 'none'
+                      }}
+                    >
+                      <Card.Header 
+                        className={`py-3 ${order.isEmergency && order.status !== 'delivered' ? 'bg-danger text-white' : 'bg-light'}`} 
+                        style={{ borderRadius: '1rem 1rem 0 0' }}
+                      >
                         <div className="d-flex justify-content-between align-items-center">
                           <div className="d-flex align-items-center">
+                            {order.isEmergency && order.status !== 'delivered' && (
+                              <div className="bg-white text-danger rounded-circle d-flex align-items-center justify-content-center me-2" 
+                                   style={{ width: '32px', height: '32px', fontSize: '1rem' }}>
+                                🚨
+                              </div>
+                            )}
                             <div className="bg-primary rounded-circle d-flex align-items-center justify-content-center me-2" 
                                  style={{ width: '32px', height: '32px', fontSize: '0.8rem' }}>
                               <i className="bi bi-box text-white"></i>
                             </div>
                             <div>
                               <div className="fw-bold small">{order.userName}</div>
-                              <small className="text-muted">
+                              <small className={order.isEmergency && order.status !== 'delivered' ? 'text-light' : 'text-muted'}>
                                 {formatOrderDate(order.date)}
                               </small>
+                              {order.isEmergency && order.status !== 'delivered' && (
+                                <div className="small text-warning fw-bold">🚨 PEDIDO URGENTE</div>
+                              )}
                             </div>
                           </div>
                           <Badge 
@@ -364,6 +409,38 @@ const DeliveryOrdersPage = () => {
                               <i className="bi bi-check-circle-fill me-2"></i>
                               Pedido Entregado
                             </Button>
+                          ) : order.isEmergency && order.status !== 'delivered' && !order.assignedTo ? (
+                            <div className="d-grid gap-2">
+                              <Button
+                                variant="danger"
+                                size="sm"
+                                className="py-2"
+                                onClick={() => handleSelfAssignUrgentOrder(order)}
+                                style={{ borderRadius: '0.75rem' }}
+                              >
+                                <i className="bi bi-exclamation-triangle-fill me-2"></i>
+                                🚨 ¡Tomar Pedido Urgente!
+                              </Button>
+                              <small className="text-center text-muted">
+                                Este pedido está disponible para todos los repartidores
+                              </small>
+                            </div>
+                          ) : order.isEmergency && order.status !== 'delivered' && order.assignedTo === user?.email ? (
+                            <div className="d-grid gap-2">
+                              <Button
+                                variant="warning"
+                                size="sm"
+                                className="py-2"
+                                onClick={() => handleUpdateStatus(order)}
+                                style={{ borderRadius: '0.75rem' }}
+                              >
+                                <i className="bi bi-pencil-square me-2"></i>
+                                🚨 Actualizar Estado (URGENTE)
+                              </Button>
+                              <small className="text-center text-danger fw-bold">
+                                PEDIDO URGENTE ASIGNADO A TI
+                              </small>
+                            </div>
                           ) : (
                             <Button
                               variant="primary"
@@ -387,14 +464,27 @@ const DeliveryOrdersPage = () => {
                   <Row>
                     {orders.map((order) => (
                       <Col xs={12} md={6} lg={4} key={order.id} className="mb-4">
-                        <Card className="h-100 shadow-sm">
-                          <Card.Header className="d-flex justify-content-between align-items-center">
-                            <small className="text-muted">
+                        <Card 
+                          className={`h-100 shadow-sm ${order.isEmergency && order.status !== 'delivered' ? 'border-danger' : ''}`}
+                          style={{ 
+                            backgroundColor: order.isEmergency && order.status !== 'delivered' ? '#fff5f5' : 'white',
+                            border: order.isEmergency && order.status !== 'delivered' ? '2px solid #dc3545' : ''
+                          }}
+                        >
+                          <Card.Header 
+                            className={`d-flex justify-content-between align-items-center ${order.isEmergency && order.status !== 'delivered' ? 'bg-danger text-white' : ''}`}
+                          >
+                            <small className={order.isEmergency && order.status !== 'delivered' ? 'text-light' : 'text-muted'}>
                               {new Date(order.date).toLocaleDateString()}
                             </small>
-                            <Badge bg={getStatusColor(order.status)}>
-                              {getStatusText(order.status)}
-                            </Badge>
+                            <div className="d-flex gap-2 align-items-center">
+                              {order.isEmergency && order.status !== 'delivered' && (
+                                <Badge bg="warning" text="dark">🚨 URGENTE</Badge>
+                              )}
+                              <Badge bg={getStatusColor(order.status)}>
+                                {getStatusText(order.status)}
+                              </Badge>
+                            </div>
                           </Card.Header>
                           
                           <Card.Body>
@@ -436,16 +526,57 @@ const DeliveryOrdersPage = () => {
                           </Card.Body>
                           
                           <Card.Footer>
-                            <Button 
-                              variant="primary" 
-                              size="sm" 
-                              className="w-100"
-                              onClick={() => handleUpdateStatus(order)}
-                              disabled={order.status === 'delivered'}
-                            >
-                              <i className="bi bi-pencil-square me-2"></i>
-                              {order.status === 'delivered' ? 'Entregado' : 'Actualizar Estado'}
-                            </Button>
+                            {order.status === 'delivered' ? (
+                              <Button 
+                                variant="success" 
+                                size="sm" 
+                                className="w-100"
+                                disabled
+                              >
+                                <i className="bi bi-check-circle-fill me-2"></i>
+                                Entregado
+                              </Button>
+                            ) : order.isEmergency && order.status !== 'delivered' && !order.assignedTo ? (
+                              <div className="d-grid gap-2">
+                                <Button 
+                                  variant="danger" 
+                                  size="sm" 
+                                  className="w-100"
+                                  onClick={() => handleSelfAssignUrgentOrder(order)}
+                                >
+                                  <i className="bi bi-exclamation-triangle-fill me-2"></i>
+                                  🚨 ¡Tomar Urgente!
+                                </Button>
+                                <small className="text-center text-muted">
+                                  Disponible para todos
+                                </small>
+                              </div>
+                            ) : order.isEmergency && order.status !== 'delivered' && order.assignedTo === user?.email ? (
+                              <div className="d-grid gap-2">
+                                <Button 
+                                  variant="warning" 
+                                  size="sm" 
+                                  className="w-100"
+                                  onClick={() => handleUpdateStatus(order)}
+                                >
+                                  <i className="bi bi-pencil-square me-2"></i>
+                                  🚨 Actualizar (URGENTE)
+                                </Button>
+                                <small className="text-center text-danger fw-bold">
+                                  ASIGNADO A TI
+                                </small>
+                              </div>
+                            ) : (
+                              <Button 
+                                variant="primary" 
+                                size="sm" 
+                                className="w-100"
+                                onClick={() => handleUpdateStatus(order)}
+                              >
+                                <i className="bi bi-pencil-square me-2"></i>
+                                Actualizar Estado
+                              </Button>
+                            )}
                           </Card.Footer>
                         </Card>
                       </Col>

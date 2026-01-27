@@ -24,7 +24,6 @@ import {
   getAllDeliveryOrders,
   assignOrderToDelivery, 
   getAvailableDeliveryUsers,
-  markOrderAsEmergency,
   DeliveryOrder 
 } from '../../services/deliveryService';
 import { db } from '../../utils/firebase';
@@ -139,7 +138,7 @@ export default function AdminOrdersPage() {
           case 'pending':
             return order.status === 'pending';
           case 'emergency':
-            return (order.isEmergency || order.priority === 'high') && order.status !== 'delivered';
+            return order.isEmergency || order.priority === 'high';
           default:
             return true;
         }
@@ -166,13 +165,10 @@ export default function AdminOrdersPage() {
       );
     }
     
-    // Ordenar por fecha y emergencia (pero no emergencias entregadas)
+    // Ordenar por fecha y emergencia
     filtered.sort((a, b) => {
-      const aIsActiveEmergency = (a.isEmergency || a.priority === 'high') && a.status !== 'delivered';
-      const bIsActiveEmergency = (b.isEmergency || b.priority === 'high') && b.status !== 'delivered';
-      
-      if (aIsActiveEmergency && !bIsActiveEmergency) return -1;
-      if (!aIsActiveEmergency && bIsActiveEmergency) return 1;
+      if (a.isEmergency && !b.isEmergency) return -1;
+      if (!a.isEmergency && b.isEmergency) return 1;
       return new Date(b.date).getTime() - new Date(a.date).getTime();
     });
     
@@ -260,61 +256,19 @@ export default function AdminOrdersPage() {
 
   const handleAssignDelivery = async (orderId: string, deliveryEmail: string) => {
     try {
-      console.log('🚀 Asignando orden:', { orderId, deliveryEmail });
-      
       await assignOrderToDelivery(orderId, deliveryEmail);
       
-      // Actualizar estados
-      setPendingDeliveries(prev => prev.filter(order => 
-        order.orderId !== orderId && order.id !== orderId
-      ));
+      setPendingDeliveries(prev => prev.filter(order => order.id !== orderId));
       
-      // Recargar datos
       const allOrders = await getAllDeliveryOrders();
       setAllDeliveries(allOrders);
       setAllOrders(allOrders);
       
       alert('✅ Orden asignada correctamente al repartidor');
       
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error asignando orden:', error);
-      const errorMessage = error?.message || 'Error desconocido';
-      alert(`❌ Error al asignar la orden: ${errorMessage}`);
-    }
-  };
-
-  const handleMarkAsEmergency = async (order: DeliveryOrder, reason?: string) => {
-    try {
-      const emergencyReason = reason || prompt('Motivo de la emergencia:', 'Pedido marcado como urgente por administrador') || 'Marcado como urgente';
-      
-      if (!emergencyReason.trim()) {
-        return;
-      }
-
-      const orderIdToUse = order.orderId || order.id;
-      if (!orderIdToUse) {
-        throw new Error('No se pudo identificar el ID de la orden');
-      }
-
-      console.log('🚨 Marcando como emergencia:', { orderIdToUse, emergencyReason });
-      
-      await markOrderAsEmergency(orderIdToUse, emergencyReason, user?.email || 'admin');
-      
-      // Recargar datos para reflejar los cambios
-      const allOrders = await getAllDeliveryOrders();
-      setAllDeliveries(allOrders);
-      setAllOrders(allOrders);
-      
-      // Cerrar modal
-      setShowOrderDetailsModal(false);
-      setSelectedOrderDetails(null);
-      
-      alert('🚨 Pedido marcado como EMERGENCIA exitosamente');
-      
-    } catch (error: any) {
-      console.error('Error marcando como emergencia:', error);
-      const errorMessage = error?.message || 'Error desconocido';
-      alert(`❌ Error al marcar como emergencia: ${errorMessage}`);
+      alert('❌ Error al asignar la orden');
     }
   };
 
@@ -633,9 +587,7 @@ export default function AdminOrdersPage() {
                             <Card.Body className="text-center">
                               <i className="bi bi-exclamation-triangle text-danger" style={{ fontSize: '2rem' }}></i>
                               <h4 className="mt-2 mb-1 text-danger">
-                                {filteredOrders.filter(o => 
-                                  (o.isEmergency || o.priority === 'high') && o.status !== 'delivered'
-                                ).length}
+                                {filteredOrders.filter(o => o.isEmergency || o.priority === 'high').length}
                               </h4>
                               <small className="text-muted">Emergencias</small>
                             </Card.Body>
@@ -655,18 +607,14 @@ export default function AdminOrdersPage() {
                       </Row>
 
                       {/* Alertas de Emergencia */}
-                      {filteredOrders.filter(o => 
-                        (o.isEmergency || o.priority === 'high') && o.status !== 'delivered'
-                      ).length > 0 && (
+                      {filteredOrders.filter(o => o.isEmergency || o.priority === 'high').length > 0 && (
                         <Alert variant="danger" className="mb-4">
                           <Alert.Heading>
                             <i className="bi bi-exclamation-triangle-fill me-2"></i>
                             🚨 Pedidos en Emergencia
                           </Alert.Heading>
                           <p className="mb-0">
-                            Hay <strong>{filteredOrders.filter(o => 
-                              (o.isEmergency || o.priority === 'high') && o.status !== 'delivered'
-                            ).length}</strong> pedidos marcados como emergencia que requieren atención inmediata.
+                            Hay <strong>{filteredOrders.filter(o => o.isEmergency || o.priority === 'high').length}</strong> pedidos marcados como emergencia que requieren atención inmediata.
                           </p>
                         </Alert>
                       )}
@@ -717,13 +665,10 @@ export default function AdminOrdersPage() {
                                 </thead>
                                 <tbody>
                                   {filteredOrders.map((order) => (
-                                    <tr key={order.id} className={
-                                      (order.isEmergency || order.priority === 'high') && order.status !== 'delivered' 
-                                        ? 'table-danger' : ''
-                                    }>
+                                    <tr key={order.id} className={order.isEmergency ? 'table-danger' : ''}>
                                       <td>
                                         <div className="d-flex align-items-center gap-2">
-                                          {(order.isEmergency || order.priority === 'high') && order.status !== 'delivered' && (
+                                          {order.isEmergency && (
                                             <Badge bg="danger" className="me-1">
                                               🚨 EMERGENCIA
                                             </Badge>
@@ -778,11 +723,6 @@ export default function AdminOrdersPage() {
                                               {availableDeliveryUsers.find(u => u.email === order.assignedTo)?.name || 
                                                order.assignedTo.split('@')[0]}
                                             </Badge>
-                                            {order.autoAssigned && (
-                                              <div className="small text-success">
-                                                <i className="bi bi-robot"></i> Auto-asignado
-                                              </div>
-                                            )}
                                             {order.status === 'delivered' && order.deliveredAt && (
                                               <div className="small text-success">
                                                 Entregado: {new Date(order.deliveredAt).toLocaleString('es-ES')}
@@ -806,24 +746,13 @@ export default function AdminOrdersPage() {
                                           >
                                             👁️
                                           </Button>
-                                          {order.status !== 'delivered' && 
-                                           !(order.isEmergency || order.priority === 'high') && (
-                                            <Button
-                                              size="sm"
-                                              variant="outline-warning"
-                                              onClick={() => handleMarkAsEmergency(order)}
-                                              title="Marcar como urgente"
-                                            >
-                                              🚨
-                                            </Button>
-                                          )}
                                           {order.status !== 'delivered' && !order.assignedTo && (
                                             <Form.Select 
                                               size="sm" 
                                               style={{ width: 'auto', minWidth: '120px' }}
                                               onChange={(e) => {
                                                 if (e.target.value) {
-                                                  handleAssignDelivery(order.orderId || order.id, e.target.value);
+                                                  handleAssignDelivery(order.id, e.target.value);
                                                 }
                                               }}
                                               defaultValue=""
@@ -893,35 +822,9 @@ export default function AdminOrdersPage() {
                   }>
                     {selectedOrderDetails.status}
                   </Badge>
-                  {selectedOrderDetails.isEmergency && selectedOrderDetails.status !== 'delivered' && (
-                    <div className="mt-2">
-                      <Badge bg="danger" className="me-2">🚨 EMERGENCIA</Badge>
-                      {selectedOrderDetails.emergencyReason && (
-                        <div className="small text-muted mt-1">
-                          <strong>Motivo:</strong> {selectedOrderDetails.emergencyReason}
-                        </div>
-                      )}
-                      {selectedOrderDetails.emergencyMarkedAt && (
-                        <div className="small text-muted">
-                          <strong>Marcado:</strong> {new Date(selectedOrderDetails.emergencyMarkedAt).toLocaleString('es-ES')}
-                        </div>
-                      )}
-                    </div>
-                  )}
                   {selectedOrderDetails.assignedTo && (
                     <div className="mt-2">
                       <strong>🚛 Repartidor:</strong> {selectedOrderDetails.assignedTo}
-                      {selectedOrderDetails.autoAssigned && (
-                        <div className="small text-success mt-1">
-                          <i className="bi bi-robot me-1"></i>
-                          <strong>Asignación automática:</strong> {selectedOrderDetails.assignedReason || 'Asignado automáticamente por zona'}
-                        </div>
-                      )}
-                      {selectedOrderDetails.assignedAt && (
-                        <div className="small text-muted">
-                          <strong>Asignado:</strong> {new Date(selectedOrderDetails.assignedAt).toLocaleString('es-ES')}
-                        </div>
-                      )}
                     </div>
                   )}
                 </Col>
@@ -946,13 +849,11 @@ export default function AdminOrdersPage() {
             Cerrar
           </Button>
           {selectedOrderDetails && selectedOrderDetails.status !== 'delivered' && (
-            <Button 
-              variant={selectedOrderDetails.isEmergency ? "danger" : "warning"} 
-              disabled={selectedOrderDetails.isEmergency}
-              onClick={() => handleMarkAsEmergency(selectedOrderDetails)}
-            >
+            <Button variant="warning" onClick={() => {
+              console.log('Marcar como urgente:', selectedOrderDetails.id);
+            }}>
               <i className="bi bi-exclamation-triangle me-2"></i>
-              {selectedOrderDetails.isEmergency ? 'Ya es Emergencia' : 'Marcar como Urgente'}
+              Marcar como Urgente
             </Button>
           )}
         </Modal.Footer>

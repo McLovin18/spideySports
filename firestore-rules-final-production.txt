@@ -1,11 +1,3 @@
-// 🔒 REGLAS DE FIRESTORE FINALES CON SISTEMA DE DELIVERY DINÁMICO
-// Versión 8.2 - REGLAS FINALES PARA PRODUCCIÓN
-// ✅ Compatible con sistema automatizado de notificaciones
-// ✅ Permisos correctos para deliveryUsers dinámicos
-// ✅ Sistema seguro pero funcional para operaciones automatizadas
-// ✅ VALIDADO: Admin puede agregar CUALQUIER usuario como delivery (sin restricciones de email)
-// ✅ SIN HARDCODED EMAILS: Sistema 100% dinámico
-// Copia estas reglas en Firebase Console → Firestore Database → Rules
 
 rules_version = '2';
 service cloud.firestore {
@@ -23,8 +15,11 @@ service cloud.firestore {
     function isAdmin() {
       return isAuthenticated() && (
         request.auth.uid == "byRByEqdFOYxXOmUu9clvujvIUg1" ||
+        request.auth.uid == "aXMfHxmFm4TIqDrxT6IK6qARO9L2" ||
         (request.auth.token.email != null && (
           request.auth.token.email == "hectorcobea03@gmail.com" ||
+          request.auth.token.email == "lucilaaquino79@gmail.com" ||
+          request.auth.token.email == "tiffanysvariedades@gmail.com" ||
           request.auth.token.email == "hwcobena@espol.edu.ec"
         ))
       );
@@ -62,8 +57,9 @@ service cloud.firestore {
       return status in ['pending', 'assigned', 'picked_up', 'in_transit', 'delivered', 'cancelled'];
     }
 
+    // 🔧 FUNCIÓN ACTUALIZADA PARA NOTIFICACIONES - INCLUYE NUEVOS ESTADOS
     function isValidNotificationStatus(status) {
-      return status in ['pending', 'sent', 'accepted', 'rejected', 'expired'];
+      return status in ['pending', 'sent', 'accepted', 'rejected', 'expired', 'read', 'completed_delivery'];
     }
 
     function isValidRating(rating) {
@@ -82,43 +78,58 @@ service cloud.firestore {
     }
 
     function isValidInventoryData(data) {
-      return data.keys().hasAll(['productId', 'name', 'price', 'stock', 'isActive']) &&
-             data.productId is number &&
-             data.name is string &&
-             data.price is number &&
-             data.stock is number &&
-             data.isActive is bool &&
-             data.price >= 0 &&
-             data.stock >= 0;
+      return data.keys().hasAll(['productId','name','price','stock','isActive']) &&
+        data.productId is number &&
+        data.name is string && data.name.size() > 0 &&
+        data.price is number && data.price >= 0 &&
+        data.stock is number && data.stock >= 0 &&
+        data.isActive is bool &&
+        (!data.keys().hasAny(['images']) || (data.images is list && data.images.size() > 0)) &&
+        (!data.keys().hasAny(['league']) || data.league is string);
     }
 
-    function isValidCartItem(item) {
-      return item is map &&
-        item.keys().hasAll(['id', 'name', 'price', 'quantity', 'image']) &&
-        item.id is string && item.name is string &&
-        item.price is number && item.price >= 0 &&
-        item.quantity is number && item.quantity > 0 && item.quantity <= 10 &&
-        item.image is string;
+    match /guestPurchases/{docId} {
+      allow read: if isAdmin(); // Solo admins pueden leer compras de invitados
+      allow write: if true; // Permitir compras de invitados
     }
+    
+    
+    
+        // 🆕 NOTIFICACIONES DE USUARIO (cupones y estado de pedido)
+    match /userNotifications/{notificationId} {
+      // Leer notificaciones propias o cualquier notificación siendo admin
+      allow read: if isAuthenticated() && (
+        isAdmin() ||
+        resource.data.userId == request.auth.uid
+      );
 
-    function isValidGuestPurchase(data) {
-      return data.keys().hasAll(['items', 'total', 'status', 'date']) &&
-        data.items is list && data.items.size() > 0 && data.items.size() <= 40 &&
-        data.items.where(item => isValidCartItem(item)).size() == data.items.size() &&
-        data.total is number && data.total >= 0 &&
-        data.status in ['pending', 'paid', 'confirmed'] &&
-        data.date is string;
-    }
+      // Listar (consultas) – misma condición que read
+      allow list: if isAuthenticated() && (
+        isAdmin() ||
+        resource.data.userId == request.auth.uid
+      );
 
-    function isValidCouponData(data) {
-      return data.keys().hasAll(['code', 'userId', 'discountPercent', 'isActive', 'used', 'createdAt', 'source']) &&
-        data.code is string && data.code.size() >= 6 && data.code.size() <= 24 &&
-        data.userId is string && data.userId.size() > 0 &&
-        data.discountPercent is number && data.discountPercent > 0 && data.discountPercent <= 90 &&
-        data.isActive is bool && data.used is bool &&
-        data.createdAt is string &&
-        data.source in ['manual', 'auto'];
+      // Crear notificación:
+      // - El propio usuario (futuras automatizaciones)
+      // - O un admin (cupones manuales / automáticos)
+      allow create: if isAuthenticated() && (
+        isAdmin() ||
+        request.resource.data.userId == request.auth.uid
+      );
+
+      // Actualizar (marcar como leída): solo el dueño o admin
+      allow update: if isAuthenticated() && (
+        isAdmin() ||
+        resource.data.userId == request.auth.uid
+      );
+
+      // Eliminar: solo admin (opcional, para limpieza)
+      allow delete: if isAdmin();
     }
+    
+    
+    
+    
 
     // ✅ USUARIOS: Seguridad robusta pero funcional
     match /users/{userId} {
@@ -197,24 +208,21 @@ service cloud.firestore {
 
     // ✅ INVENTARIO: 🌟 PÚBLICO PARA LECTURA + COMPRAS PERMITIDAS 🌟
     match /inventory/{productId} {
-      // 🔓 LECTURA PÚBLICA: Cualquiera puede ver productos disponibles
-      allow read: if true;
-      
-      // 🔓 LISTADO PÚBLICO: Cualquiera puede ver catálogo de productos
-      allow list: if true;
-      
-      // 🔒 ESCRITURA: Solo administradores PUEDEN CREAR/ELIMINAR
-      allow create: if isAdmin() && isValidInventoryData(request.resource.data);
-      allow delete: if isAdmin();
-      
-      // 🛒 ACTUALIZACIÓN: Administradores O reducción de stock por compra válida
-      allow update: if isAdmin() || (
-        // Permitir a usuarios autenticados reducir stock durante compras
-        isAuthenticated()
-        // Simplificamos: solo verificamos que sea usuario autenticado
-        // La lógica de negocio se valida en el código de la aplicación
-      );
+      allow read, list: if true;
+
+      // Crear y eliminar solo admin
+      allow create, delete: if isAdmin();
+
+      // Update del inventario SOLO admin o compra válida
+      allow update: if 
+        isAdmin() ||
+        (
+          request.resource.data.keys().hasAll(['productId','name','price','stock','isActive']) &&
+          request.resource.data.stock is number &&
+          request.resource.data.stock >= 0
+        );
     }
+
 
     // ✅ PRODUCTOS: Lectura pública, escritura solo admin
     match /products/{productId} {
@@ -240,46 +248,48 @@ service cloud.firestore {
           (resource.data.userId == request.auth.uid || isAdmin());
       }
     }
+    
+    
+    
+
+      // Bloques para la colección de blogs
+    match /blogs/{blogId} {
+      // Lectura pública: todos pueden ver blogs
+      allow read: if true;
+
+      // Escritura: solo admin puede crear/editar/eliminar blogs
+      allow create, update, delete: if isAdmin();
+
+      // Subcollection de comentarios
+      match /comments/{commentId} {
+        // Lectura pública
+        allow read: if true;
+
+        // Crear comentario: solo usuarios autenticados
+        allow create: if isAuthenticated() &&
+          request.resource.data.userId == request.auth.uid &&
+          request.resource.data.name is string &&
+          request.resource.data.text is string;
+
+        // Actualizar comentario: solo el autor
+        allow update: if isAuthenticated() &&
+          resource.data.userId == request.auth.uid;
+
+        // Borrar comentario: autor o admin
+        allow delete: if isAuthenticated() &&
+          (resource.data.userId == request.auth.uid || isAdmin());
+      }
+    }
+
+    
+    
+    
+    
 
     // ✅ PEDIDOS DIARIOS: Permitir a usuarios autenticados crear y actualizar durante compras
     match /dailyOrders/{date} {
-      allow read, list: if isAdmin();
-      allow create: if isAuthenticated(); // Para proceso de compra
-      allow update: if isAuthenticated(); // Para agregar órdenes durante compra
-      allow delete: if false;
-    }
-
-    // 🛒 COMPRAS DE INVITADOS (checkout sin autenticación obligatoria)
-    match /guestPurchases/{purchaseId} {
-      allow read: if isAdmin();
-      allow list: if isAdmin();
-
-      allow create: if (
-        (request.auth == null && isValidGuestPurchase(request.resource.data)) ||
-        (isAdmin() && isValidGuestPurchase(request.resource.data))
-      );
-
-      allow update, delete: if false;
-    }
-
-    // 🎟️ CUPONES PERSONALIZADOS PARA CLIENTES FRECUENTES
-    match /coupons/{couponCode} {
-      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow list: if isAuthenticated();
-
-      allow create: if isAuthenticated() &&
-        request.resource.data.userId == request.auth.uid &&
-        isValidCouponData(request.resource.data);
-
-      allow update: if isAuthenticated() && (
-        isAdmin() || (
-          resource.data.userId == request.auth.uid &&
-          request.resource.data.userId == request.auth.uid &&
-          request.resource.data.discountPercent is number &&
-          request.resource.data.discountPercent > 0 && request.resource.data.discountPercent <= 90
-        )
-      );
-
+      allow read, list: if true; // TEMPORAL: Muy permisivo para debugging
+      allow create, update: if true; // solo para pruebas
       allow delete: if false;
     }
 
@@ -295,13 +305,16 @@ service cloud.firestore {
       );
       
       // 📝 CREACIÓN: Durante compra con validación simplificada
-      allow create: if isAuthenticated() &&
-        request.resource.data.keys().hasAll(['userId', 'items', 'total', 'status']) &&
-        request.resource.data.total is number &&
-        request.resource.data.total > 0 &&
-        request.resource.data.items is list &&
-        request.resource.data.items.size() > 0;
-      
+      allow create: if 
+          // Usuario autenticado
+          isAuthenticated() ||
+          // Invitado con campo explícito
+          (request.resource.data.guestCheckout == true &&
+           request.resource.data.keys().hasAll(['items', 'total', 'status']) &&
+           request.resource.data.total is number &&
+           request.resource.data.items is list &&
+           request.resource.data.items.size() > 0);
+
       // ✏️ ACTUALIZACIÓN: Más permisivo para sistema automatizado y marcado urgente
       allow update: if isAuthenticated() && (
         // Admin puede hacer cualquier cambio
@@ -332,55 +345,45 @@ service cloud.firestore {
       );
     }
 
-    // 🆕 DELIVERY NOTIFICATIONS: Sistema de notificaciones automáticas
+    // 🚨 DELIVERY NOTIFICATIONS: REGLAS ESPECÍFICAS PARA SOLUCIONAR ERROR PERMISOS
     match /deliveryNotifications/{notificationId} {
-      // 📖 LECTURA: Admin, delivery persons y sistema automatizado
-      allow read: if isAuthenticated() && (
-        isAdmin() ||
-        isDeliveryUser() ||
-        // Permitir lectura para sistema automatizado
-        true
-      );
+      // 📖 LECTURA: COMPLETAMENTE ABIERTA PARA USUARIOS AUTENTICADOS
+      allow read: if isAuthenticated();
       
-      // 📝 CREACIÓN: Sistema automatizado más permisivo
-      allow create: if isAuthenticated() && (
-        // Admin puede crear cualquier notificación
-        isAdmin() ||
-        // Cualquier usuario autenticado puede crear notificaciones básicas (para sistema automatizado)
-        (request.resource.data.keys().hasAll(['orderId', 'orderData']) &&
-         request.resource.data.orderId is string &&
-         request.resource.data.orderData is map) ||
-        // Delivery persons pueden crear respuestas
-        (isDeliveryUser() && 
-         request.resource.data.keys().hasAll(['orderId', 'status']) &&
-         isValidNotificationStatus(request.resource.data.status))
-      );
+      // 📝 CREACIÓN: PERMITIR CREACIÓN AMPLIA PARA SISTEMA AUTOMATIZADO
+      allow create: if isAuthenticated();
       
-      // ✏️ ACTUALIZACIÓN: Más permisivo para el sistema
+      // ✏️ ACTUALIZACIÓN: ESPECÍFICAMENTE DISEÑADA PARA MARCAR COMO LEÍDA
       allow update: if isAuthenticated() && (
         // Admin puede actualizar cualquier cosa
         isAdmin() ||
-        // Delivery persons pueden actualizar su propia notificación
-        (isDeliveryUser() && 
-         isValidNotificationStatus(request.resource.data.status)) ||
-        // Sistema automatizado puede actualizar estado
+        // Delivery persons pueden marcar como leída/aceptada - PERMISOS AMPLIOS
+        (isDeliveryUser() && (
+          // Permitir actualización de cualquier campo relacionado con estado
+          request.resource.data.keys().hasAny(['status', 'readAt', 'readBy', 'acceptedAt', 'acceptedBy', 'deliveredAt']) ||
+          // Permitir estados específicos para delivery persons
+          (request.resource.data.status != null && 
+           request.resource.data.status in ['read', 'accepted', 'completed_delivery', 'expired']) ||
+          // Permitir campos de timestamp
+          (request.resource.data.readAt != null) ||
+          (request.resource.data.acceptedAt != null) ||
+          // Permitir campos de identificación
+          (request.resource.data.readBy != null) ||
+          (request.resource.data.acceptedBy != null)
+        )) ||
+        // CUALQUIER USUARIO AUTENTICADO puede actualizar para sistema automatizado
         (request.resource.data.keys().hasAny(['status', 'expiresAt']) &&
-         isValidNotificationStatus(request.resource.data.status))
+         request.resource.data.status in ['expired', 'completed_delivery', 'read']) ||
+        // MÁXIMA PERMISIVIDAD: Si tiene orderId, permitir actualización
+        (request.resource.data.keys().hasAny(['status', 'readAt', 'readBy']) &&
+         resource.data.orderId != null)
       );
       
-      allow delete: if isAuthenticated() && (
-        isAdmin() || 
-        // Permitir eliminación para limpieza automática
-        true
-      );
+      // 🗑️ ELIMINACIÓN: PERMITIR AMPLIAMENTE PARA LIMPIEZA AUTOMÁTICA
+      allow delete: if isAuthenticated();
       
-      // 📋 QUERIES: Más permisivo para el sistema
-      allow list: if isAuthenticated() && (
-        isAdmin() || 
-        isDeliveryUser() ||
-        // Permitir listado para monitoreo del sistema
-        true
-      );
+      // 📋 QUERIES: COMPLETAMENTE ABIERTA PARA USUARIOS AUTENTICADOS
+      allow list: if isAuthenticated();
     }
 
     // 🆕 DELIVERY ZONES: Configuración de zonas de entrega
@@ -391,14 +394,6 @@ service cloud.firestore {
       
       // 📝 ESCRITURA: Solo admin
       allow create, update, delete: if isAdmin();
-    }
-
-    // 🛡️ CONFIGURACIÓN PÚBLICA DE LA TIENDA (descuentos, campañas, etc.)
-    match /publicConfig/{configId} {
-      allow read: if true;
-      allow list: if true;
-      allow create, update: if isAdmin();
-      allow delete: if false;
     }
 
     // 🆕 DELIVERY PERFORMANCE: Métricas y estadísticas
@@ -495,19 +490,63 @@ service cloud.firestore {
     match /rateLimits/{userId} {
       allow read, write: if isAuthenticated() && request.auth.uid == userId;
     }
-
-    // ✅ CONFIGURACIÓN DEL SISTEMA (solo admin o autenticados)
-    match /systemConfig/{configId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
-    }
-
-    // 🛍️ CONFIGURACIÓN PÚBLICA (descuentos, banners, etc.)
+    
+        // 🛍️ CONFIGURACIÓN PÚBLICA (descuentos, banners, etc.)
     // Se usa para mostrar campañas como los descuentos de temporada en la página principal
     match /publicConfig/{configId} {
       allow read: if true;           // Cualquier visitante puede leer
       allow write: if isAdmin();     // Solo admin puede crear/actualizar
       allow delete: if isAdmin();
+    }
+    
+    
+    
+    
+        // 🆕 CUPONES DE DESCUENTO POR USUARIO
+    match /coupons/{couponCode} {
+      // Leer cupones propios o cualquier cupón siendo admin
+      allow read: if isAuthenticated() && (
+        isAdmin() ||
+        resource.data.userId == request.auth.uid
+      );
+
+      // Listar cupones: misma condición que read
+      allow list: if isAuthenticated() && (
+        isAdmin() ||
+        resource.data.userId == request.auth.uid
+      );
+
+      // Crear cupón:
+      // - Admin puede crear cupones para cualquier userId (caso Beneficios)
+      // - Un usuario autenticado puede crear cupones SOLO para sí mismo
+      //   (caso cupones automáticos por múltiplo de compras)
+      allow create: if isAuthenticated() && (
+        isAdmin() ||
+        request.resource.data.userId == request.auth.uid
+      );
+
+      // Actualizar cupón (marcar como usado):
+      // - Admin puede actualizar cualquier cupón
+      // - El dueño puede actualizar SOLO si sigue siendo el mismo userId
+      allow update: if isAuthenticated() && (
+        isAdmin() ||
+        (
+          resource.data.userId == request.auth.uid &&
+          request.resource.data.userId == request.auth.uid
+        )
+      );
+
+      // Eliminar cupones solo admin (por si necesitas limpieza manual)
+      allow delete: if isAdmin();
+    }
+    
+    
+    
+
+    // ✅ CONFIGURACIÓN DEL SISTEMA
+    match /systemConfig/{configId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
     }
 
     // ✅ PRUEBAS DE CONEXIÓN (TEMPORAL)
@@ -515,9 +554,5 @@ service cloud.firestore {
       allow read, write: if isAuthenticated();
     }
 
-    // ✅ REGLA DE FALLBACK - DENEGACIÓN EXPLÍCITA
-    match /{document=**} {
-      allow read, write: if false;
-    }
   }
 }

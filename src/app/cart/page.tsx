@@ -429,21 +429,6 @@ const CartPage = () => {
 
       const purchaseId = await savePurchase(purchaseData, userInfo.userName, userInfo.userEmail);
 
-      try {
-        await createDeliveryOrder(purchaseData, userInfo.userName || 'Usuario', userInfo.userEmail || user.email || 'email@example.com', purchaseId);
-        const { notificationService } = await import('../services/notificationService');
-        await notificationService.createNotification({
-          orderId: purchaseId,
-          userName: userInfo.userName || 'Usuario',
-          userEmail: userInfo.userEmail || user.email || 'email@example.com',
-          total: purchaseData.total,
-          items: purchaseData.items,
-          deliveryLocation: purchaseData.shipping
-        });
-      } catch (deliveryError) {
-        console.error('⚠️ Error en creación de delivery/notificación:', deliveryError);
-      }
-
       await cartService.clearCart(user.uid);
       setPaymentSuccess(true);
 

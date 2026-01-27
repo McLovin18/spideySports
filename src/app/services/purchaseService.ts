@@ -7,6 +7,7 @@ import { SecureLogger } from '../utils/security';
 import { inventoryService } from './inventoryService';
 import { couponService } from './couponService';
 import { userNotificationService } from './userNotificationService';
+import { createDeliveryOrder } from './deliveryService';
 import { type JerseySizeCode } from '../constants/jersey';
 
 // 🔧 Eliminar valores undefined antes de enviar datos a Firestore
@@ -245,6 +246,14 @@ export const savePurchase = async (
     const isGuest = !currentUser;
     const finalUserId = isGuest ? 'guest' : purchase.userId;
 
+    // 🔍 DIAGNÓSTICO: Log del estado de autenticación
+    console.log('🔍 [savePurchase] Estado de autenticación:');
+    console.log('   - currentUser:', currentUser ? 'existe' : 'null');
+    console.log('   - isGuest:', isGuest);
+    console.log('   - finalUserId:', finalUserId);
+    console.log('   - purchase.userId:', purchase.userId);
+    console.log('   - userEmail:', userEmail);
+
     // Generar IDs legibles de cliente/pedido (solo para usuarios autenticados con email)
     let customerCode: string | undefined;
     let orderNumber: string | undefined;
@@ -360,18 +369,23 @@ export const savePurchase = async (
         await setDoc(
           dailyOrderRef,
           {
+            date: dayKey, // CRÍTICO: Campo requerido para orderBy('date')
+            dateFormatted: currentDate.toLocaleDateString('es-ES'),
             orders: arrayUnion(sanitizedOrderData),
             totalOrdersCount: increment(1),
             totalDayAmount: increment(purchase.total),
+            createdAt: currentDate.toISOString(),
             lastUpdated: currentDate.toISOString()
           },
           { merge: true }
         );
       } catch (dailyError) {
-        console.warn('No se pudo guardar en dailyOrders:', dailyError);
+        console.error('❌ [savePurchase] Error guardando en dailyOrders:', dailyError);
       }
+    }
 
-      // 🎁 Generar cupones automáticos para clientes frecuentes (si está activo)
+    // 🎁 Generar cupones automáticos para clientes frecuentes (si está activo)
+    if (!isGuest) {
       try {
         const autoConfig = await couponService.getAutoConfig();
         if (autoConfig && autoConfig.isActive && autoConfig.orderMultiple > 0) {
@@ -410,6 +424,39 @@ export const savePurchase = async (
       } catch (couponError) {
         console.warn('No se pudo generar cupón automático para el usuario:', couponError);
       }
+    }
+
+    // 🚚 CREAR ORDEN DE DELIVERY AUTOMÁTICAMENTE
+    try {
+      console.log('🚚 Creando orden de delivery automáticamente...');
+      
+      const deliveryOrderData = {
+        userId: finalUserId,
+        items: purchase.items,
+        total: purchase.total,
+        date: dateString,
+        shipping: purchase.shipping,
+        paypalDetails: purchase.paypalDetails || {},
+        fullOrderId: fullOrderId,
+        customerCode: customerCode,
+        orderNumber: orderNumber
+      };
+      
+      const finalUserName = userName || 'Cliente';
+      const finalUserEmail = userEmail || (isGuest ? 'guest@localhost' : purchase.userEmail || 'unknown@localhost');
+      
+      const deliveryOrderId = await createDeliveryOrder(
+        deliveryOrderData, 
+        finalUserName, 
+        finalUserEmail, 
+        purchaseId
+      );
+      
+      console.log(`✅ Orden de delivery creada automáticamente: ${deliveryOrderId}`);
+      
+    } catch (deliveryError) {
+      console.error('❌ Error creando orden de delivery (compra guardada exitosamente):', deliveryError);
+      // No lanzar error ya que la compra se guardó correctamente
     }
 
     return purchaseId;

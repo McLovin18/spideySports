@@ -129,6 +129,8 @@ const ProfilePage = () => {
   const handleLogout = async () => {
     try {
       await logout();
+      // Al cerrar sesión desde el perfil, ir a la página inicial
+      router.push('/');
     } catch (error) {
       console.error('Error al cerrar sesión:', error);
     }

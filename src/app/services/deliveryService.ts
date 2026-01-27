@@ -3,13 +3,14 @@ import {
   collection, 
   addDoc, 
   getDocs, 
+  getDoc,
   query, 
   where, 
   updateDoc, 
   doc,
   limit,
-  getDoc,
-  orderBy
+  orderBy,
+  runTransaction
 } from 'firebase/firestore';
 import { InputValidator, DataSanitizer } from '../utils/security';
 import { VALIDATION_RULES } from '../utils/securityConfig';
@@ -55,12 +56,30 @@ export interface DeliveryOrder {
   date: string;
   items: any[];
   total: number;
-  status: 'pending' | 'assigned' | 'picked_up' | 'in_transit' | 'delivered' | 'cancelled';
+  status: 'pending' | 'assigned' | 'picked_up' | 'in_transit' | 'delivered' | 'cancelled' | 'competing';
   assignedTo?: string; // Email del delivery
   assignedAt?: string;
   deliveryNotes?: string;
   paypalDetails: any;
   shipping: any;
+  // ✅ PROPIEDADES DE EMERGENCIA
+  isEmergency?: boolean;
+  priority?: 'low' | 'normal' | 'high' | 'urgent';
+  emergencyReason?: string;
+  emergencyMarkedAt?: string;
+  emergencyMarkedBy?: string;
+  // ✅ PROPIEDADES DE ASIGNACIÓN AUTOMÁTICA
+  autoAssigned?: boolean; // Indica si fue asignado automáticamente
+  assignedReason?: string; // Razón de la asignación
+  // ✅ PROPIEDADES ADICIONALES DE LA COMPRA
+  fullOrderId?: string; // ID completo legible del pedido
+  customerCode?: string; // Código del cliente
+  orderNumber?: string; // Número de orden
+  // ✅ PROPIEDADES DE COMPETENCIA ENTRE REPARTIDORES
+  assignmentType?: 'direct' | 'competition' | 'manual';
+  availableFor?: string[]; // Emails de repartidores que pueden aceptar la orden
+  competitionStarted?: string;
+  competitionEnded?: string;
   // ✅ NUEVO: Información de ubicación
   deliveryLocation?: {
     address: string;
@@ -73,6 +92,16 @@ export interface DeliveryOrder {
     deliveryZone?: string; // Norte, Sur, Centro, etc.
     estimatedDistance?: number; // en km desde el centro
   };
+}
+
+// ✅ Información básica de repartidores disponibles
+export interface DeliveryUserInfo {
+  email: string;
+  name?: string;
+  status?: string;
+  isBlocked?: boolean;
+  zones?: string[];
+  [key: string]: any;
 }
 
 // ✅ NUEVO: Interfaz para calificaciones de delivery
@@ -143,6 +172,10 @@ export const createDeliveryOrder = async (purchaseData: any, userName: string, u
       status: 'pending',
       paypalDetails: purchaseData.paypalDetails,
       shipping: purchaseData.shipping,
+      // ✅ Agregar propiedades adicionales de la compra si existen
+      ...(purchaseData.fullOrderId && { fullOrderId: purchaseData.fullOrderId }),
+      ...(purchaseData.customerCode && { customerCode: purchaseData.customerCode }),
+      ...(purchaseData.orderNumber && { orderNumber: purchaseData.orderNumber }),
       ...(deliveryLocation && { deliveryLocation })
     };
 
@@ -162,6 +195,101 @@ export const createDeliveryOrder = async (purchaseData: any, userName: string, u
       await updateDoc(docRef, {
         orderId: docRef.id
       });
+    }
+    
+    // 🚀 ASIGNACIÓN AUTOMÁTICA POR ZONA
+    try {
+      const city = deliveryLocation?.city || purchaseData.shipping?.city || 'guayaquil';
+      const zone = deliveryLocation?.deliveryZone || purchaseData.shipping?.zone || 'general';
+      
+      console.log(`🎯 Procesando asignación para zona: ${zone}, ciudad: ${city}`);
+      
+      const availableDeliveries = await findAllDeliveriesInZone(zone, city);
+      
+      if (availableDeliveries.length === 0) {
+        console.log(`❌ No hay repartidores disponibles para zona ${zone} en ${city}. La orden quedará pendiente para asignación manual.`);
+        
+      } else if (availableDeliveries.length === 1) {
+        // 🎯 CASO 1: Solo hay UN repartidor → Asignación automática directa
+        const singleDelivery = availableDeliveries[0];
+        
+        await updateDoc(docRef, {
+          status: 'assigned',
+          assignedTo: singleDelivery.email,
+          assignedAt: new Date().toISOString(),
+          autoAssigned: true,
+          assignedReason: `Auto-asignado directamente (único repartidor en zona ${zone})`
+        });
+        
+        console.log(`✅ Orden auto-asignada DIRECTAMENTE a ${singleDelivery.name || singleDelivery.email} (único en zona)`);
+        
+        // Notificación de asignación directa (no urgente)
+        try {
+          await notificationService.createNotification({
+            orderId: purchaseId || docRef.id,
+            userName: sanitizedUserName,
+            userEmail: sanitizedUserEmail,
+            total: purchaseData.total,
+            items: purchaseData.items,
+            shipping: {
+              city,
+              zone,
+              address: deliveryLocation?.address || purchaseData.shipping?.address || 'No especificada',
+              phone: purchaseData.shipping?.phone || 'No especificado'
+            },
+            deliveryLocation: deliveryLocation || {
+              city,
+              zone,
+              address: purchaseData.shipping?.address || 'No especificada',
+              phone: purchaseData.shipping?.phone || 'No especificado'
+            },
+            targetDeliveryEmail: singleDelivery.email
+          });
+        } catch (notificationError) {
+          console.error('Error enviando notificación de asignación directa:', notificationError);
+        }
+        
+      } else {
+        // 🏁 CASO 2: Hay MÚLTIPLES repartidores → Sistema de competencia por aceptación
+        console.log(`🏁 Múltiples repartidores (${availableDeliveries.length}) en zona ${zone}. Creando sistema de competencia...`);
+        
+        // Marcar como disponible para competencia
+        await updateDoc(docRef, {
+          status: 'competing',  // Nuevo estado para órdenes en competencia
+          availableFor: availableDeliveries.map(d => d.email), // Lista de repartidores elegibles
+          competitionStarted: new Date().toISOString(),
+          assignmentType: 'competition',
+          assignmentReason: `Disponible para ${availableDeliveries.length} repartidores en zona ${zone}`
+        });
+        
+        // Enviar notificación a TODOS los repartidores elegibles
+        const notificationPromises = availableDeliveries.map(async (delivery) => {
+          try {
+            await notificationService.createUrgentNotification(
+              delivery.email,
+              `🏁 Nueva Orden Disponible`,
+              `Nueva orden de ${sanitizedUserName} en tu zona ${zone}. Total: $${purchaseData.total}. ¡El primero en aceptar se la lleva!`,
+              {
+                orderId: purchaseId || docRef.id,
+                type: 'order_competition',
+                priority: 'high',
+                zone: zone,
+                city: city,
+                action: 'accept_order'  // Acción que pueden tomar
+              }
+            );
+          } catch (notifError) {
+            console.error(`Error notificando a ${delivery.email}:`, notifError);
+          }
+        });
+        
+        await Promise.allSettled(notificationPromises);
+        console.log(`✅ Notificaciones de competencia enviadas a ${availableDeliveries.length} repartidores`);
+      }
+      
+    } catch (autoAssignError) {
+      console.error('Error en asignación automática (orden creada correctamente):', autoAssignError);
+      // La orden ya se creó exitosamente, solo falló la asignación automática
     }
     
     return docRef.id;
@@ -186,29 +314,334 @@ export const assignOrderToDelivery = async (orderId: string, deliveryEmail: stri
     // ✅ Sanitizar datos
     const sanitizedDeliveryEmail = DataSanitizer.sanitizeText(deliveryEmail);
 
-    // 🔍 BUSCAR EL DOCUMENTO POR orderId EN LUGAR DEL ID DEL DOCUMENTO
-    const ordersQuery = query(
-      collection(db, 'deliveryOrders'),
-      where('orderId', '==', orderId)
-    );
-    
-    const querySnapshot = await getDocs(ordersQuery);
-    
-    if (querySnapshot.empty) {
+  // 🔍 BUSCAR EL DOCUMENTO POR orderId PRIMERO
+  const ordersQuery = query(
+    collection(db, 'deliveryOrders'),
+    where('orderId', '==', orderId)
+  );
+  
+  const querySnapshot = await getDocs(ordersQuery);
+  let orderDoc;
+  let orderRef;
+  
+  if (querySnapshot.empty) {
+    // 🔍 Si no se encuentra por orderId, intentar buscar por ID del documento
+    console.log(`🔍 No se encontró por orderId: ${orderId}, intentando por ID del documento`);
+    try {
+      orderRef = doc(db, 'deliveryOrders', orderId);
+      const docSnap = await getDoc(orderRef);
+      
+      if (!docSnap.exists()) {
+        throw new Error(`No se encontró la orden con ID: ${orderId}`);
+      }
+      
+      orderDoc = docSnap;
+    } catch (docError) {
       throw new Error(`No se encontró la orden con ID: ${orderId}`);
     }
-
+  } else {
     // Tomar el primer documento encontrado
-    const orderDoc = querySnapshot.docs[0];
-    const orderRef = doc(db, 'deliveryOrders', orderDoc.id);
-
-    await updateDoc(orderRef, {
+    orderDoc = querySnapshot.docs[0];
+    orderRef = doc(db, 'deliveryOrders', orderDoc.id);
+  }    await updateDoc(orderRef, {
       status: 'assigned',
       assignedTo: sanitizedDeliveryEmail,
       assignedAt: new Date().toISOString()
     });
 
   } catch (error) {
+    throw error;
+  }
+};
+
+// ✅ Marcar orden como urgente
+export const markOrderAsEmergency = async (orderId: string, reason: string = 'Marcado como urgente por administrador', markedBy: string = 'admin') => {
+  try {
+    if (!orderId) {
+      throw new Error('ID de orden requerido');
+    }
+
+    // 🔍 BUSCAR EL DOCUMENTO POR orderId PRIMERO
+    const ordersQuery = query(
+      collection(db, 'deliveryOrders'),
+      where('orderId', '==', orderId)
+    );
+    
+    const querySnapshot = await getDocs(ordersQuery);
+    let orderDoc;
+    let orderRef;
+    
+    if (querySnapshot.empty) {
+      // 🔍 Si no se encuentra por orderId, intentar buscar por ID del documento
+      console.log(`🔍 No se encontró por orderId: ${orderId}, intentando por ID del documento`);
+      try {
+        orderRef = doc(db, 'deliveryOrders', orderId);
+        const docSnap = await getDoc(orderRef);
+        
+        if (!docSnap.exists()) {
+          throw new Error(`No se encontró la orden con ID: ${orderId}`);
+        }
+        
+        orderDoc = docSnap;
+      } catch (docError) {
+        throw new Error(`No se encontró la orden con ID: ${orderId}`);
+      }
+    } else {
+      // Tomar el primer documento encontrado
+      orderDoc = querySnapshot.docs[0];
+      orderRef = doc(db, 'deliveryOrders', orderDoc.id);
+    }
+
+    const updateData = {
+      isEmergency: true,
+      priority: 'urgent' as const,
+      emergencyReason: DataSanitizer.sanitizeText(reason),
+      emergencyMarkedAt: new Date().toISOString(),
+      emergencyMarkedBy: DataSanitizer.sanitizeText(markedBy)
+    };
+
+    await updateDoc(orderRef, updateData);
+
+    // 🚨 Enviar notificación de emergencia si está asignado
+    const orderData = orderDoc.data() as DeliveryOrder;
+    if (orderData.assignedTo) {
+      try {
+        await notificationService.createUrgentNotification(
+          orderData.assignedTo,
+          `🚨 PEDIDO URGENTE`,
+          `El pedido ${orderData.orderId || orderDoc.id} ha sido marcado como EMERGENCIA. Motivo: ${reason}`,
+          {
+            orderId: orderData.orderId || orderDoc.id,
+            type: 'emergency_order',
+            priority: 'urgent'
+          }
+        );
+      } catch (notifError) {
+        console.error('Error enviando notificación de emergencia:', notifError);
+      }
+    }
+
+    console.log(`🚨 Orden ${orderId} marcada como emergencia`);
+    
+  } catch (error) {
+    console.error('Error marcando orden como emergencia:', error);
+    throw error;
+  }
+};
+
+// ✅ Auto-asignarse a una orden urgente (para deliveries)
+export const selfAssignUrgentOrder = async (orderId: string, deliveryEmail: string) => {
+  try {
+    if (!orderId || !deliveryEmail) {
+      throw new Error('ID de orden y email de delivery requeridos');
+    }
+
+    if (!InputValidator.isValidEmail(deliveryEmail)) {
+      throw new Error('Email de delivery inválido');
+    }
+
+    // ✅ Sanitizar datos
+    const sanitizedDeliveryEmail = DataSanitizer.sanitizeText(deliveryEmail);
+
+    // 🔍 BUSCAR EL DOCUMENTO POR orderId PRIMERO
+    const ordersQuery = query(
+      collection(db, 'deliveryOrders'),
+      where('orderId', '==', orderId)
+    );
+    
+    const querySnapshot = await getDocs(ordersQuery);
+    let orderDoc;
+    let orderRef;
+    
+    if (querySnapshot.empty) {
+      // 🔍 Si no se encuentra por orderId, intentar buscar por ID del documento
+      console.log(`🔍 No se encontró por orderId: ${orderId}, intentando por ID del documento`);
+      try {
+        orderRef = doc(db, 'deliveryOrders', orderId);
+        const docSnap = await getDoc(orderRef);
+        
+        if (!docSnap.exists()) {
+          throw new Error(`No se encontró la orden con ID: ${orderId}`);
+        }
+        
+        orderDoc = docSnap;
+      } catch (docError) {
+        throw new Error(`No se encontró la orden con ID: ${orderId}`);
+      }
+    } else {
+      // Tomar el primer documento encontrado
+      orderDoc = querySnapshot.docs[0];
+      orderRef = doc(db, 'deliveryOrders', orderDoc.id);
+    }
+
+    const orderData = orderDoc.data() as DeliveryOrder;
+    
+    // Verificar que la orden sea urgente y esté disponible
+    if (!orderData.isEmergency) {
+      throw new Error('Solo se pueden auto-asignar órdenes marcadas como emergencia');
+    }
+
+    if (orderData.assignedTo && orderData.assignedTo !== sanitizedDeliveryEmail) {
+      throw new Error('Esta orden urgente ya fue tomada por otro repartidor');
+    }
+
+    await updateDoc(orderRef, {
+      status: 'assigned',
+      assignedTo: sanitizedDeliveryEmail,
+      assignedAt: new Date().toISOString(),
+      selfAssigned: true // Marcar que se auto-asignó
+    });
+
+    console.log(`🚨 Orden urgente ${orderId} auto-asignada a ${sanitizedDeliveryEmail}`);
+    
+    return {
+      success: true,
+      message: 'Orden urgente asignada exitosamente'
+    };
+    
+  } catch (error) {
+    console.error('Error en auto-asignación de orden urgente:', error);
+    throw error;
+  }
+};
+
+// ✅ Aceptar una orden en modo competencia (el primero que acepta gana)
+export const acceptCompetingOrder = async (orderId: string, deliveryEmail: string) => {
+  try {
+    if (!orderId || !deliveryEmail) {
+      throw new Error('ID de orden y email de delivery requeridos');
+    }
+
+    if (!InputValidator.isValidEmail(deliveryEmail)) {
+      throw new Error('Email de delivery inválido');
+    }
+
+    const sanitizedDeliveryEmail = DataSanitizer.sanitizeText(deliveryEmail);
+
+    // 🔍 Primero localizar el documento (por orderId o por ID de documento)
+    const ordersQuery = query(
+      collection(db, 'deliveryOrders'),
+      where('orderId', '==', orderId)
+    );
+
+    const querySnapshot = await getDocs(ordersQuery);
+    let orderRef;
+
+    if (querySnapshot.empty) {
+      // Intentar por ID de documento
+      console.log(`🔍 [acceptCompetingOrder] No se encontró por orderId: ${orderId}, intentando por ID del documento`);
+      orderRef = doc(db, 'deliveryOrders', orderId);
+      const docSnap = await getDoc(orderRef);
+      if (!docSnap.exists()) {
+        throw new Error(`No se encontró la orden con ID: ${orderId}`);
+      }
+    } else {
+      const orderDoc = querySnapshot.docs[0];
+      orderRef = doc(db, 'deliveryOrders', orderDoc.id);
+    }
+
+    // ⚖️ Usar transacción para evitar condiciones de carrera
+    let winnerOrderData: DeliveryOrder | null = null;
+
+    await runTransaction(db, async (transaction) => {
+      const snap = await transaction.get(orderRef);
+      if (!snap.exists()) {
+        throw new Error('La orden ya no existe');
+      }
+
+      const data = snap.data() as DeliveryOrder;
+
+      // Guardar copia para usar fuera de la transacción
+      winnerOrderData = { id: snap.id, ...data } as DeliveryOrder;
+
+      // Debe seguir en modo competencia
+      if (data.status !== 'competing') {
+        if (data.assignedTo && data.assignedTo === sanitizedDeliveryEmail) {
+          throw new Error('Ya tienes asignada esta orden');
+        }
+        throw new Error('La orden ya no está disponible para competencia');
+      }
+
+      // Validar que este repartidor esté autorizado
+      const availableFor = data.availableFor || [];
+      if (!availableFor.includes(sanitizedDeliveryEmail)) {
+        throw new Error('No estás autorizado para aceptar esta orden');
+      }
+
+      // Verificar que aún no esté asignada a otro
+      if (data.assignedTo && data.assignedTo !== sanitizedDeliveryEmail) {
+        throw new Error('La orden ya fue tomada por otro repartidor');
+      }
+
+      const now = new Date().toISOString();
+
+      transaction.update(orderRef, {
+        status: 'assigned',
+        assignedTo: sanitizedDeliveryEmail,
+        assignedAt: now,
+        competitionEnded: now,
+        assignmentType: 'competition',
+        assignedReason: `Orden asignada por competencia al repartidor ${sanitizedDeliveryEmail}`
+      });
+    });
+
+    // Si por alguna razón no se obtuvo data, algo salió mal
+    if (!winnerOrderData) {
+      throw new Error('No se pudo completar la aceptación de la orden');
+    }
+
+    const finalOrderData: DeliveryOrder = winnerOrderData as DeliveryOrder;
+
+    const availableFor = finalOrderData.availableFor || [];
+    const otherDeliveries = availableFor.filter((email: string) => email !== deliveryEmail);
+
+    // 🔔 Notificar al ganador
+    try {
+      await notificationService.createUrgentNotification(
+        sanitizedDeliveryEmail,
+        '🏆 Orden Asignada por Competencia',
+        `Has ganado la orden ${finalOrderData.orderId || finalOrderData.id} en la zona ${finalOrderData.deliveryLocation?.deliveryZone || ''}.`,
+        {
+          orderId: finalOrderData.orderId || finalOrderData.id,
+          type: 'competition_won',
+          priority: 'high'
+        }
+      );
+    } catch (notifyWinnerError) {
+      console.error('Error notificando al repartidor ganador:', notifyWinnerError);
+    }
+
+    // 🔔 Notificar a los que no ganaron (si se desea)
+    if (otherDeliveries.length > 0) {
+      const loserPromises = otherDeliveries.map(async (email: string) => {
+        try {
+          await notificationService.createUrgentNotification(
+            email,
+            '⏱ Orden ya fue tomada',
+            `La orden ${finalOrderData.orderId || finalOrderData.id} ya fue aceptada por otro repartidor.`,
+            {
+              orderId: finalOrderData.orderId || finalOrderData.id,
+              type: 'competition_lost',
+              priority: 'normal'
+            }
+          );
+        } catch (notifyLoserError) {
+          console.error(`Error notificando a repartidor sin orden (${email}):`, notifyLoserError);
+        }
+      });
+
+      await Promise.allSettled(loserPromises);
+    }
+
+    console.log(`🏆 Orden ${orderId} aceptada exitosamente por ${deliveryEmail}`);
+
+    return {
+      success: true,
+      message: 'Orden aceptada exitosamente',
+      assignedTo: deliveryEmail
+    };
+  } catch (error) {
+    console.error('Error al aceptar orden en competencia:', error);
     throw error;
   }
 };
@@ -237,26 +670,70 @@ export const getPendingOrders = async () => {
   }
 };
 
-// ✅ Obtener órdenes de un delivery específico
+// ✅ Obtener órdenes de un delivery específico + órdenes urgentes disponibles
 export const getDeliveryOrders = async (deliveryEmail: string) => {
   try {
-    const ordersQuery = query(
+    // 🔍 Obtener órdenes asignadas a este delivery
+    const assignedOrdersQuery = query(
       collection(db, 'deliveryOrders'),
       where('assignedTo', '==', deliveryEmail)
     );
     
-    const querySnapshot = await getDocs(ordersQuery);
-    const orders: DeliveryOrder[] = [];
+    // 🚨 Obtener órdenes urgentes no asignadas y no entregadas (disponibles para todos)
+    const urgentOrdersQuery = query(
+      collection(db, 'deliveryOrders'),
+      where('isEmergency', '==', true),
+      where('status', 'in', ['pending', 'assigned']) // Solo pendientes o recien asignadas, NO entregadas
+    );
     
-    querySnapshot.forEach((doc) => {
-      orders.push({
+    const [assignedSnapshot, urgentSnapshot] = await Promise.all([
+      getDocs(assignedOrdersQuery),
+      getDocs(urgentOrdersQuery)
+    ]);
+    
+    const orders: DeliveryOrder[] = [];
+    const orderIds = new Set<string>(); // Para evitar duplicados
+    
+    // Agregar órdenes asignadas
+    assignedSnapshot.forEach((doc) => {
+      const order = {
         id: doc.id,
         ...doc.data()
-      } as DeliveryOrder);
+      } as DeliveryOrder;
+      
+      orders.push(order);
+      orderIds.add(doc.id);
+    });
+    
+    // Agregar órdenes urgentes que no estén ya incluidas
+    urgentSnapshot.forEach((doc) => {
+      if (!orderIds.has(doc.id)) {
+        const order = {
+          id: doc.id,
+          ...doc.data(),
+          availableForAll: true // Marcar como disponible para todos
+        } as DeliveryOrder & { availableForAll?: boolean };
+        
+        orders.push(order);
+      }
+    });
+    
+    // Ordenar: urgentes activas primero, luego por fecha descendente
+    orders.sort((a, b) => {
+      // Solo urgentes no entregadas van primero
+      const aIsActiveEmergency = a.isEmergency && a.status !== 'delivered';
+      const bIsActiveEmergency = b.isEmergency && b.status !== 'delivered';
+      
+      if (aIsActiveEmergency && !bIsActiveEmergency) return -1;
+      if (!aIsActiveEmergency && bIsActiveEmergency) return 1;
+      
+      // Después por fecha
+      return new Date(b.date).getTime() - new Date(a.date).getTime();
     });
     
     return orders;
   } catch (error) {
+    console.error('Error obteniendo órdenes de delivery:', error);
     throw error;
   }
 };
@@ -402,14 +879,89 @@ export const updateOrderStatus = async (
   }
 };
 
+// ✅ Encontrar TODOS los repartidores disponibles en una zona
+export const findAllDeliveriesInZone = async (deliveryZone: string, city: string = 'guayaquil') => {
+  try {
+    console.log(`🔍 Buscando TODOS los repartidores disponibles para zona: ${deliveryZone}, ciudad: ${city}`);
+    
+    const deliveryUsers = await getAvailableDeliveryUsers();
+    
+    if (deliveryUsers.length === 0) {
+      console.log('❌ No hay repartidores registrados');
+      return [];
+    }
+
+    // Buscar repartidores que cubran esta zona específica
+    const availableForZone = deliveryUsers.filter(user => {
+      // Verificar si el repartidor está activo/disponible
+      if (user.status === 'inactive' || user.isBlocked) {
+        return false;
+      }
+      
+      // Verificar zonas del repartidor
+      const userZones = user.zones || [];
+      const cityKey = city.toLowerCase();
+      
+      // Buscar coincidencia exacta de zona
+      const hasExactZone = userZones.some((zone: string) => 
+        zone.toLowerCase() === deliveryZone.toLowerCase() ||
+        zone.toLowerCase().includes(deliveryZone.toLowerCase()) ||
+        deliveryZone.toLowerCase().includes(zone.toLowerCase())
+      );
+      
+      // Si no hay coincidencia exacta, buscar por patrones de ciudad
+      const hasGeneralCity = !hasExactZone && userZones.some((zone: string) => 
+        zone.toLowerCase().includes(cityKey) ||
+        zone.toLowerCase().includes('general') ||
+        zone.toLowerCase().includes('todo')
+      );
+      
+      return hasExactZone || hasGeneralCity;
+    });
+
+    console.log(`✅ Encontrados ${availableForZone.length} repartidores disponibles para zona ${deliveryZone}`);
+    
+    return availableForZone;
+    
+  } catch (error) {
+    console.error('Error buscando repartidores por zona:', error);
+    return [];
+  }
+};
+
+// ✅ Encontrar repartidor disponible por zona automáticamente (LEGACY - mantener por compatibilidad)
+export const findAvailableDeliveryByZone = async (deliveryZone: string, city: string = 'guayaquil') => {
+  const allAvailable = await findAllDeliveriesInZone(deliveryZone, city);
+  if (allAvailable.length === 0) return null;
+  
+  // Seleccionar el mejor de los disponibles
+  return await selectBestDeliveryUser(allAvailable);
+};
+
+// ✅ Seleccionar el mejor repartidor basado en carga de trabajo
+const selectBestDeliveryUser = async (availableUsers: any[]) => {
+  try {
+    // Por ahora, seleccionar aleatoriamente - puedes mejorar esta lógica
+    // En el futuro puedes agregar lógica para:
+    // - Contar órdenes activas por repartidor
+    // - Verificar última asignación 
+    // - Considerar calificaciones
+    const randomIndex = Math.floor(Math.random() * availableUsers.length);
+    return availableUsers[randomIndex];
+  } catch (error) {
+    console.error('Error seleccionando mejor repartidor:', error);
+    return availableUsers[0]; // Fallback al primero
+  }
+};
+
 // ✅ Obtener lista de repartidores disponibles dinámicamente desde Firebase
-export const getAvailableDeliveryUsers = async () => {
+export const getAvailableDeliveryUsers = async (): Promise<DeliveryUserInfo[]> => {
   try {
     const deliveryUsersSnapshot = await getDocs(collection(db, 'deliveryUsers'));
-    const deliveryUsers = deliveryUsersSnapshot.docs.map(doc => ({
+    const deliveryUsers: DeliveryUserInfo[] = deliveryUsersSnapshot.docs.map(doc => ({
       email: doc.id,
       ...doc.data()
-    }));
+    } as DeliveryUserInfo));
     
     console.log(`📋 ${deliveryUsers.length} repartidores activos encontrados`);
     return deliveryUsers;

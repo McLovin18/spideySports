@@ -20,20 +20,15 @@ export const SUBCATEGORIES = [
   { id: "nationalTeams", value: "americas", label: "Américas (CONMEBOL/CONCACAF)", minId: 2200, maxId: 2399 },
   { id: "nationalTeams", value: "africa", label: "África (CAF)", minId: 2400, maxId: 2599 },
   { id: "nationalTeams", value: "asia-oceania", label: "Asia & Oceanía (AFC/OFC)", minId: 2600, maxId: 2799 },
-  { id: "nationalTeams", value: "legendary", label: "Históricas & Campeonas", minId: 2800, maxId: 2999 },
 
   // Categoría 3: Ediciones Especiales (3000-3999)
   { id: "specialEditions", value: "limited-edition", label: "Limited Edition", minId: 3000, maxId: 3299 },
-  { id: "specialEditions", value: "collabs", label: "Colaboraciones & Lifestyle", minId: 3300, maxId: 3599 },
-  { id: "specialEditions", value: "matchday", label: "Player Issue / Match Day", minId: 3600, maxId: 3799 },
-  { id: "specialEditions", value: "street-football", label: "Street Football & Cultura", minId: 3800, maxId: 3999 },
 
   // Categoría 4: Retro & Leyendas (4000-4999)
   { id: "retroClassics", value: "retro-80s", label: "Década de los 80", minId: 4000, maxId: 4199 },
   { id: "retroClassics", value: "retro-90s", label: "Década de los 90", minId: 4200, maxId: 4399 },
   { id: "retroClassics", value: "retro-2000s", label: "Década de los 2000", minId: 4400, maxId: 4599 },
   { id: "retroClassics", value: "retro-iconic", label: "Iconos Eternos", minId: 4600, maxId: 4799 },
-  { id: "retroClassics", value: "retro-femenil", label: "Hitos del Fútbol Femenino", minId: 4800, maxId: 4999 },
 ];
 
 // Lista plana alternativa de subcategorías (solo id + nombre)

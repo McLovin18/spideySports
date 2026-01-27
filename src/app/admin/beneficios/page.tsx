@@ -221,7 +221,9 @@ const BeneficiosPage: React.FC = () => {
         });
       });
 
-      const list = Array.from(customerMap.values()).sort((a, b) => b.totalOrders - a.totalOrders);
+      const list = Array.from(customerMap.values())
+        .filter(customer => customer.totalOrders >= 3) // 🎯 Solo clientes con 3+ pedidos
+        .sort((a, b) => b.totalOrders - a.totalOrders);
       setCustomers(list);
     } catch (err: any) {
       console.error('Error cargando datos de cupones:', err);
@@ -803,7 +805,10 @@ const BeneficiosPage: React.FC = () => {
                 <Col lg={7} className="mb-3">
                   <Card className="shadow-sm benefits-card h-100">
                     <Card.Header className="benefits-card__header d-flex justify-content-between align-items-center">
-                      <span>Clientes con pedidos</span>
+                      <div>
+                        <span>🎯 Clientes más valiosos ({customers.length})</span>
+                        <div className="small text-muted mt-1">Solo clientes con 3+ pedidos para cupones específicos</div>
+                      </div>
                       <div className="d-flex align-items-center gap-2">
                         <Form.Label className="mb-0 small">% cupón manual:</Form.Label>
                         <Form.Control
@@ -827,19 +832,26 @@ const BeneficiosPage: React.FC = () => {
                           <p className="mt-2 mb-0 text-muted">Cargando clientes...</p>
                         </div>
                       ) : customers.length === 0 ? (
-                        <div className="text-center py-3">
-                          <p className="mb-0 text-muted">No se encontraron clientes con pedidos registrados.</p>
+                        <div className="text-center py-4">
+                          <div className="text-muted mb-2">
+                            <i className="fs-1">🎯</i>
+                          </div>
+                          <h6 className="text-muted">No hay clientes con 3+ pedidos</h6>
+                          <p className="small text-muted mb-0">
+                            Los cupones específicos se enfocan en clientes frecuentes.<br/>
+                            Cuando tengas clientes con 3 o más pedidos aparecerán aquí.
+                          </p>
                         </div>
                       ) : (
                         <div className="table-responsive">
                           <Table hover size="sm" className="mb-0 benefits-table">
                             <thead>
                               <tr>
-                                <th>Cliente</th>
-                                <th>Email</th>
-                                <th className="text-center">Pedidos</th>
-                                <th className="text-end">Total</th>
-                                <th className="text-center">Acciones</th>
+                                <th>👤 Cliente</th>
+                                <th>📧 Email</th>
+                                <th className="text-center">🛒 Pedidos</th>
+                                <th className="text-end">💰 Total gastado</th>
+                                <th className="text-center">🎁 Cupón</th>
                               </tr>
                             </thead>
                             <tbody>

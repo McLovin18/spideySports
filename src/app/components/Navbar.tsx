@@ -125,7 +125,13 @@ const NavbarComponent = () => {
   }, [isClient, user?.uid]);
 
   const handleLogout = async () => {
-    try { await logout(); } catch (err) { console.error(err); }
+    try {
+      await logout();
+      // Redirigir siempre a la página inicial después de cerrar sesión
+      router.push('/');
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   // Maneja click en título de categoría (abre/cierra acordeón)

@@ -29,6 +29,7 @@ export default function AdminCustomersPage() {
   const [customers, setCustomers] = useState<CustomerSummary[]>([]);
   const [filteredCustomers, setFilteredCustomers] = useState<CustomerSummary[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [minOrdersFilter, setMinOrdersFilter] = useState<number>(1);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerSummary | null>(null);
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
 
@@ -39,19 +40,27 @@ export default function AdminCustomersPage() {
   }, [user, isAdmin]);
 
   useEffect(() => {
-    if (!searchTerm.trim()) {
-      setFilteredCustomers(customers);
-      return;
+    let filtered = customers;
+    
+    // Filtro por cantidad mínima de pedidos
+    if (minOrdersFilter > 1) {
+      filtered = filtered.filter(c => c.totalOrders >= minOrdersFilter);
     }
-    const term = searchTerm.toLowerCase();
-    const filtered = customers.filter((c) => {
-      const name = c.userName?.toLowerCase() || '';
-      const email = c.userEmail?.toLowerCase() || '';
-      const id = c.userId.toLowerCase();
-      return name.includes(term) || email.includes(term) || id.includes(term);
-    });
+    
+    // Filtro por término de búsqueda
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase();
+      filtered = filtered.filter((c) => {
+        const name = c.userName?.toLowerCase() || '';
+        const email = c.userEmail?.toLowerCase() || '';
+        const id = c.userId.toLowerCase();
+        const code = c.customerCode?.toLowerCase() || '';
+        return name.includes(term) || email.includes(term) || id.includes(term) || code.includes(term);
+      });
+    }
+    
     setFilteredCustomers(filtered);
-  }, [searchTerm, customers]);
+  }, [searchTerm, minOrdersFilter, customers]);
 
   const loadCustomerData = async () => {
     try {
@@ -99,6 +108,7 @@ export default function AdminCustomersPage() {
       });
 
       const list = Array.from(customerMap.values()).sort((a, b) => b.totalOrders - a.totalOrders);
+      
       setCustomers(list);
       setFilteredCustomers(list);
     } catch (err: any) {
@@ -216,32 +226,63 @@ export default function AdminCustomersPage() {
               </Row>
             )}
 
-            <Row className="mb-3 align-items-center">
-              <Col md={6} className="mb-2 mb-md-0">
-                <Form.Control
-                  type="text"
-                  placeholder="Buscar por nombre, email o ID de usuario"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </Col>
-              <Col md={6} className="text-md-end text-start">
-                <Button
-                  variant="outline-secondary"
-                  size="sm"
-                  onClick={loadCustomerData}
-                  disabled={loading}
-                >
-                  {loading ? 'Actualizando...' : 'Actualizar datos'}
-                </Button>
-              </Col>
-            </Row>
+            <Card className="mb-3 shadow-sm">
+              <Card.Body className="py-3">
+                <Row className="align-items-center">
+                  <Col md={5} className="mb-2 mb-md-0">
+                    <Form.Group>
+                      <Form.Label className="small text-muted mb-1">🔍 Buscar cliente</Form.Label>
+                      <Form.Control
+                        type="text"
+                        placeholder="Nombre, email, código o ID..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        size="sm"
+                      />
+                    </Form.Group>
+                  </Col>
+                  <Col md={3} className="mb-2 mb-md-0">
+                    <Form.Group>
+                      <Form.Label className="small text-muted mb-1">📊 Mínimo de pedidos</Form.Label>
+                      <Form.Select
+                        value={minOrdersFilter}
+                        onChange={(e) => setMinOrdersFilter(Number(e.target.value))}
+                        size="sm"
+                      >
+                        <option value={1}>1+ pedidos (todos)</option>
+                        <option value={2}>2+ pedidos</option>
+                        <option value={3}>3+ pedidos</option>
+                        <option value={5}>5+ pedidos</option>
+                        <option value={10}>10+ pedidos</option>
+                      </Form.Select>
+                    </Form.Group>
+                  </Col>
+                  <Col md={4} className="text-md-end">
+                    <div className="d-flex align-items-end justify-content-md-end gap-2">
+                      <div className="small text-muted">
+                        <div>📈 {filteredCustomers.length} clientes mostrados</div>
+                        <div>💰 Total: {formatCurrency(filteredCustomers.reduce((sum, c) => sum + c.totalAmount, 0))}</div>
+                      </div>
+                      <Button
+                        variant="outline-secondary"
+                        size="sm"
+                        onClick={loadCustomerData}
+                        disabled={loading}
+                      >
+                        {loading ? 'Actualizando...' : 'Actualizar'}
+                      </Button>
+                    </div>
+                  </Col>
+                </Row>
+              </Card.Body>
+            </Card>
 
             <Row>
               <Col xl={selectedCustomer ? 7 : 12} className="mb-3">
                 <Card className="shadow-sm">
                   <Card.Header className="d-flex justify-content-between align-items-center">
-                    <span>Lista de clientes ({filteredCustomers.length})</span>
+                    <span>👥 Clientes más valiosos ({filteredCustomers.length})</span>
+                    <small className="text-muted">Ordenado por cantidad de pedidos (mayor a menor)</small>
                   </Card.Header>
                   <Card.Body className="p-0">
                     {loading ? (
@@ -260,9 +301,9 @@ export default function AdminCustomersPage() {
                             <tr>
                               <th>Cliente</th>
                               <th>Email</th>
-                              <th className="text-center">Pedidos</th>
-                              <th className="text-end">Total gastado</th>
-                              <th className="text-end">Último pedido</th>
+                              <th className="text-center">🛒 Pedidos</th>
+                              <th className="text-end">💰 Total gastado</th>
+                              <th className="text-end">📅 Último pedido</th>
                               <th className="text-end">Acciones</th>
                             </tr>
                           </thead>

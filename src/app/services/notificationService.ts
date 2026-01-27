@@ -357,6 +357,53 @@ export class NotificationService {
     }
   }
 
+  // 🚨 CREAR NOTIFICACIÓN URGENTE DIRECTA PARA UN DELIVERY ESPECÍFICO
+  async createUrgentNotification(
+    deliveryEmail: string,
+    title: string,
+    message: string,
+    payload: any = {}
+  ): Promise<string> {
+    try {
+      const orderId = payload.orderId || `ORDER_${Date.now()}`;
+
+      const notificationData: any = {
+        orderId,
+        orderData: {
+          userName: payload.userName || 'Cliente SpideySports',
+          userEmail: payload.userEmail || '',
+          total: payload.total || 0,
+          items: payload.items || [],
+          deliveryLocation: {
+            city: payload.city || payload.shipping?.city || 'No especificada',
+            zone: payload.zone || payload.shipping?.zone || 'No especificada',
+            address: payload.address || payload.shipping?.address || 'No especificada',
+            phone: payload.phone || payload.shipping?.phone || 'No especificado'
+          }
+        },
+        targetZones: [deliveryEmail], // Usar email como "zona" específica
+        targetDeliveryEmail: deliveryEmail,
+        createdAt: Timestamp.fromDate(new Date()),
+        expiresAt: Timestamp.fromDate(new Date(Date.now() + 10 * 60 * 1000)), // 10 minutos
+        status: 'pending',
+        isUrgent: true,
+        customTitle: title,
+        customMessage: message,
+        payload
+      };
+
+      const docRef = await addDoc(collection(db, 'deliveryNotifications'), notificationData);
+
+      // Programar expiración urgente
+      this.scheduleUrgentNotificationExpiry(docRef.id);
+
+      return docRef.id;
+    } catch (error) {
+      console.error('Error creando notificación urgente directa:', error);
+      throw error;
+    }
+  }
+
   // 🚨 CREAR NOTIFICACIÓN URGENTE PARA TODOS LOS DELIVERY (CON PREVENCIÓN DE DUPLICADOS)
   async createUrgentNotificationForAll(orderData: any): Promise<string> {
     try {
