@@ -6,12 +6,45 @@
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
+/* Wrapper del botón con tooltip */
+.floatingButtonWrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Tooltip */
+.tooltip {
+  background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* Botón flotante */
 .floatingButton {
   width: auto;
   height: auto;
-  border-radius: 12px;
-  background: transparent;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
   border: none;
   cursor: pointer;
   display: flex;
@@ -20,24 +53,26 @@
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
   transition: all 0.3s ease;
   position: relative;
-  padding: 0;
-  overflow: hidden;
+  padding: 8px;
+  overflow: visible;
 }
 
 .chatImage {
-  width: auto;
-  height: auto;
+  width: 50px;
+  height: 50px;
   display: block;
   border-radius: 12px;
   transition: transform 0.3s ease;
+  object-fit: contain;
 }
 
 .floatingButton:hover .chatImage {
-  transform: scale(1.08);
+  transform: scale(1.1);
 }
 
 .floatingButton:hover {
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
+  transform: translateY(-2px);
 }
 
 .floatingButton:active {

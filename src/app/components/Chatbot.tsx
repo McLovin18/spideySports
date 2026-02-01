@@ -123,22 +123,27 @@ export default function Chatbot({ isOpen: initialIsOpen = false }: ChatbotProps)
 
   return (
     <div className={styles.chatbotContainer}>
-      {/* Botón flotante con imagen */}
+      {/* Botón flotante con imagen y tooltip */}
       {!isOpen && (
-        <button
-          className={styles.floatingButton}
-          onClick={() => setIsOpen(true)}
-          title="Abrir chat"
-        >
-          <Image
-            src="/chatMain.png"
-            alt="Chat"
-            width={70}
-            height={70}
-            className={styles.chatImage}
-            priority
-          />
-        </button>
+        <div className={styles.floatingButtonWrapper}>
+          <div className={styles.tooltip}>
+            💬 Consulta nuestras camisetas aquí
+          </div>
+          <button
+            className={styles.floatingButton}
+            onClick={() => setIsOpen(true)}
+            title="Abrir chat"
+          >
+            <Image
+              src="/chatMain.png"
+              alt="Chat Robot"
+              width={50}
+              height={50}
+              className={styles.chatImage}
+              priority
+            />
+          </button>
+        </div>
       )}
 
       {/* Ventana de chat */}
