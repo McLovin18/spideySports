@@ -18,7 +18,7 @@ interface ChatbotProps {
   isOpen?: boolean;
 }
 
-export default function Chatbot({ isOpen: initialIsOpen = true }: ChatbotProps) {
+export default function Chatbot({ isOpen: initialIsOpen = false }: ChatbotProps) {
   const [isOpen, setIsOpen] = useState(initialIsOpen);
   const [messages, setMessages] = useState<Message[]>([
     {

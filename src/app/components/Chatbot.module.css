@@ -58,6 +58,7 @@
   flex-direction: column;
   overflow: hidden;
   animation: slideUp 0.3s ease-out;
+  z-index: 1000;
 
   @media (max-width: 480px) {
     width: 100vw;
