@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import Image from 'next/image';
 import { Form, Button, Card, Spinner, Badge } from 'react-bootstrap';
-import { Send, X, MessageCircle, RefreshCw } from 'lucide-react';
+import { Send, X, RefreshCw } from 'lucide-react';
 import styles from './Chatbot.module.css';
 
 interface Message {
@@ -122,15 +123,21 @@ export default function Chatbot({ isOpen: initialIsOpen = true }: ChatbotProps) 
 
   return (
     <div className={styles.chatbotContainer}>
-      {/* Botón flotante */}
+      {/* Botón flotante con imagen */}
       {!isOpen && (
         <button
           className={styles.floatingButton}
           onClick={() => setIsOpen(true)}
           title="Abrir chat"
         >
-          <MessageCircle size={24} />
-          <span className={styles.badge}>Chat</span>
+          <Image
+            src="/chatMain.png"
+            alt="Chat"
+            width={70}
+            height={70}
+            className={styles.chatImage}
+            priority
+          />
         </button>
       )}
 
@@ -140,8 +147,7 @@ export default function Chatbot({ isOpen: initialIsOpen = true }: ChatbotProps) 
           {/* Header */}
           <div className={styles.chatHeader}>
             <div className={styles.headerTitle}>
-              <MessageCircle size={20} />
-              <span>SpideySports Assistant</span>
+              <span>💬 SpideySports Assistant</span>
             </div>
             <div className={styles.headerActions}>
               <button
