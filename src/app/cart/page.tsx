@@ -26,11 +26,14 @@ import {
   type QuizQuestion,
 } from '../services/quizDiscountService';
 import { getUserDisplayInfo, savePurchase, type PricingAdjustments } from '../services/purchaseService';
+import AbandonedCartAlert from '../components/AbandonedCartAlert';
+import { abandonedCartService } from '../services/abandonedCartService';
+import { useAbandonedCartTracking } from '../hooks/useAbandonedCartTracking';
 
 const roundCurrency = (value: number) => Math.round(value * 100) / 100;
 
 const CartPage = () => {
-  const { user, loading, anonymousId } = useAuth();
+  const { user, loading } = useAuth();
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [isClient, setIsClient] = useState(false);
   const [seasonalConfig, setSeasonalConfig] = useState<SeasonalDiscountConfig | null>(null);
@@ -135,6 +138,9 @@ const CartPage = () => {
     const unsub = cartService.subscribe(setCartItems, user?.uid);
     return unsub;
   }, [user?.uid, loading, isClient]);
+
+  // Rastrear carritos abandonados
+  useAbandonedCartTracking(user?.uid, cartItems, user?.email || undefined, user?.displayName || undefined);
 
   useEffect(() => {
     if (!quizCampaignActive || !quizQuestionSet) {
@@ -296,10 +302,10 @@ const CartPage = () => {
       if (!user?.uid) {
         // Pago invitado
         const purchaseData = {
-          guestId: anonymousId || `guest_${Date.now()}`,
+          guestId: `guest_${Date.now()}`,
           paymentId: details.id,
           payer: details.payer,
-          contact: { name: deliveryLocation?.name || "Invitado", phone: deliveryLocation?.phone || "", email: guestEmail },
+          contact: { name: deliveryLocation?.zone || "Invitado", phone: deliveryLocation?.phone || "", email: guestEmail },
           deliveryLocation,
           items: cartItems.map(item => ({
             id: item.id.toString(),
@@ -311,7 +317,6 @@ const CartPage = () => {
             sizeLabel: item.sizeLabel,
             versionId: item.versionId,
             versionLabel: item.versionLabel,
-            versionColorHex: item.versionColorHex
           })),
           total: finalTotal,
           ...(pricingAdjustmentsPayload ? { pricingAdjustments: pricingAdjustmentsPayload } : {}),
@@ -370,6 +375,12 @@ const CartPage = () => {
         // --- Fin envío correo ---
 
         await cartService.clearCart();
+        
+        // Limpiar carrito abandonado si existe (para usuarios no autenticados)
+        if (!user?.uid) {
+          // Usuario anonimo - no hay registro de abandono
+        }
+        
         setPaymentSuccess(true);
         window.dispatchEvent(new Event("cart-updated"));
         setProcessing(false);
@@ -402,7 +413,6 @@ const CartPage = () => {
           sizeLabel: item.sizeLabel,
           versionId: item.versionId,
           versionLabel: item.versionLabel,
-          versionColorHex: item.versionColorHex
         })),
         total: finalTotal,
         paypalDetails: {
@@ -430,6 +440,12 @@ const CartPage = () => {
       const purchaseId = await savePurchase(purchaseData, userInfo.userName, userInfo.userEmail);
 
       await cartService.clearCart(user.uid);
+      
+      // Limpiar carrito abandonado si existe
+      if (user?.uid) {
+        await abandonedCartService.deleteAbandonedCart(user.uid);
+      }
+      
       setPaymentSuccess(true);
 
     } catch (error) {
@@ -494,6 +510,9 @@ const CartPage = () => {
           <main className="flex-grow-1">
             <Container className="py-5">
               <h1 className="fw-bold text-center mb-5 text-cosmetic-tertiary">Tu Carrito</h1>
+              
+              {/* Alert de carrito abandonado */}
+              <AbandonedCartAlert userId={user?.uid || null} cartItems={cartItems} />
               {cartItems.length === 0 ? (
                 <div className="text-center py-5">
                   <i className="bi bi-bag" style={{ fontSize: '4rem' }}></i>

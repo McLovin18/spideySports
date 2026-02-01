@@ -337,6 +337,25 @@ class RecommendationEngine {
 
     return diverseRecommendations;
   }
+
+  /**
+   * Obtiene productos populares/destacados
+   */
+  public getPopularProducts(limit: number = 4): Product[] {
+    // Primero, retorna productos marcados como destacados
+    const featured = this.products.filter(p => p.featured).slice(0, limit);
+    
+    if (featured.length >= limit) {
+      return featured;
+    }
+
+    // Si no hay suficientes destacados, completa con los más vendidos basándose en el nombre/descripción
+    const remaining = this.products
+      .filter(p => !p.featured && p.inStock)
+      .slice(0, limit - featured.length);
+
+    return [...featured, ...remaining];
+  }
 }
 
 // Instancia singleton del motor de recomendaciones

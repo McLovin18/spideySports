@@ -13,6 +13,7 @@ import { useRouter } from 'next/navigation';
 import FavouriteButton from "./components/FavouriteButton";
 import Footer from "./components/Footer";
 import FeaturedCategories from "./components/categoriasDestacadas";
+import SmartRecommendations from "./components/SmartRecommendations";
 import { getSeasonalDiscountConfig, type SeasonalDiscountConfig } from './services/seasonalDiscountService';
 
 
@@ -446,6 +447,8 @@ export default function Home() {
         )}
       </Container>
       
+      {/* Sección de recomendaciones inteligentes */}
+      <SmartRecommendations title="💡 Más Populares en SpideySports" limit={4} />
 
       {/* Footer */}
       <Footer/>
@@ -573,6 +576,9 @@ export default function Home() {
             )}
 
           </Container>
+          
+          {/* Sección de recomendaciones inteligentes */}
+          <SmartRecommendations title="💡 Más Populares en SpideySports" limit={4} />
         </main>
       </div>
       <Footer/>
