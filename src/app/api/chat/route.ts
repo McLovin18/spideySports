@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { localChatbotService } from '@/app/services/chatbotService';
+import { chatbotService } from '@/app/services/chatbotService';
 
 /**
  * POST /api/chat
@@ -20,11 +20,11 @@ export async function POST(request: NextRequest) {
 
     // Si hay historial previo, restaurarlo
     if (conversationHistory && Array.isArray(conversationHistory)) {
-      localChatbotService.setHistory(conversationHistory);
+      chatbotService.setHistory(conversationHistory);
     }
 
     // Procesar mensaje
-    const response = await localChatbotService.processMessage(message);
+    const response = await chatbotService.processMessage(message);
 
     return NextResponse.json(response, { status: 200 });
   } catch (error) {
