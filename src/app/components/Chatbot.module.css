@@ -44,7 +44,7 @@
   width: auto;
   height: auto;
   border-radius: 16px;
-  background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
+  background: transparent;
   border: none;
   cursor: pointer;
   display: flex;
@@ -53,7 +53,7 @@
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
   transition: all 0.3s ease;
   position: relative;
-  padding: 8px;
+  padding: 0;
   overflow: visible;
 }
 
@@ -64,6 +64,7 @@
   border-radius: 12px;
   transition: transform 0.3s ease;
   object-fit: contain;
+  background: transparent;
 }
 
 .floatingButton:hover .chatImage {
