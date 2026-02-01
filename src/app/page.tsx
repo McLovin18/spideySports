@@ -14,6 +14,7 @@ import FavouriteButton from "./components/FavouriteButton";
 import Footer from "./components/Footer";
 import FeaturedCategories from "./components/categoriasDestacadas";
 import SmartRecommendations from "./components/SmartRecommendations";
+import Chatbot from "./components/Chatbot";
 import { getSeasonalDiscountConfig, type SeasonalDiscountConfig } from './services/seasonalDiscountService';
 
 
@@ -581,6 +582,7 @@ export default function Home() {
           <SmartRecommendations title="💡 Más Populares en SpideySports" limit={4} />
         </main>
       </div>
+      <Chatbot />
       <Footer/>
 
 
