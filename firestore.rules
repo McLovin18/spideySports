@@ -1,0 +1,486 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ✅ FUNCIONES AUXILIARES DE SEGURIDAD
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.uid == "byRByEqdFOYxXOmUu9clvujvIUg1" ||
+        request.auth.uid == "aXMfHxmFm4TIqDrxT6IK6qARO9L2" ||
+        (request.auth.token.email != null && (
+          request.auth.token.email == "hectorcobea03@gmail.com" ||
+          request.auth.token.email == "lucilaaquino79@gmail.com" ||
+          request.auth.token.email == "tiffanysvariedades@gmail.com" ||
+          request.auth.token.email == "hwcobena@espol.edu.ec"
+        ))
+      );
+    }
+
+    function isDeliveryUser() {
+      return isAuthenticated() && request.auth.token.email != null;
+    }
+
+    function canBeDeliveryUser(email) {
+      return isValidEmail(email);
+    }
+
+    function isAutomatedSystem() {
+      return isAuthenticated() && (
+        isAdmin() ||
+        (request.auth != null && request.auth.uid != null)
+      );
+    }
+
+    function isValidEmail(email) {
+      return email.matches('[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}');
+    }
+
+    function isValidString(str, minLen, maxLen) {
+      return str is string && str.size() >= minLen && str.size() <= maxLen;
+    }
+
+    function isValidDeliveryStatus(status) {
+      return status in ['pending', 'assigned', 'picked_up', 'in_transit', 'delivered', 'cancelled'];
+    }
+
+    function isValidNotificationStatus(status) {
+      return status in ['pending', 'sent', 'accepted', 'rejected', 'expired', 'read', 'completed_delivery'];
+    }
+
+    function isValidRating(rating) {
+      return rating is number && rating >= 1 && rating <= 5;
+    }
+
+    function containsNoHtml(text) {
+      return !text.matches('.*<.*>.*') && !text.matches('.*script.*');
+    }
+
+    function isBasicCommentValid(data) {
+      return data.keys().hasAll(['name', 'text', 'userId']) &&
+             data.name is string && data.name.size() > 0 &&
+             data.text is string && data.text.size() > 0 &&
+             data.userId == request.auth.uid;
+    }
+
+    function isValidInventoryData(data) {
+      return data.keys().hasAll(['productId','name','price','stock','isActive']) &&
+        data.productId is number &&
+        data.name is string && data.name.size() > 0 &&
+        data.price is number && data.price >= 0 &&
+        data.stock is number && data.stock >= 0 &&
+        data.isActive is bool &&
+        (!data.keys().hasAny(['images']) || (data.images is list && data.images.size() > 0)) &&
+        (!data.keys().hasAny(['league']) || data.league is string);
+    }
+
+    // 🆕 GUEST PURCHASES - Compras de invitados
+    match /guestPurchases/{docId} {
+      allow read: if isAdmin();
+      allow create: if request.auth == null &&
+                       request.resource.data.email != null &&
+                       isValidEmail(request.resource.data.email) &&
+                       request.resource.data.total is number &&
+                       request.resource.data.total >= 0;
+      allow update: if false;
+      allow delete: if isAdmin();
+    }
+
+    // 🆕 NOTIFICACIONES DE USUARIO (cupones y estado de pedido)
+    match /userNotifications/{notificationId} {
+      allow read: if isAuthenticated() && (
+        isAdmin() ||
+        resource.data.userId == request.auth.uid
+      );
+
+      allow list: if isAuthenticated() && (
+        isAdmin() ||
+        resource.data.userId == request.auth.uid
+      );
+
+      allow create: if isAuthenticated();
+
+      allow update: if isAuthenticated() && (
+        isAdmin() ||
+        resource.data.userId == request.auth.uid
+      );
+
+      allow delete: if isAdmin();
+    }
+
+    // ✅ USUARIOS: Seguridad robusta pero funcional
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isAuthenticated() && (isOwner(userId) || isAdmin());
+      allow update: if isOwner(userId) || isAdmin();
+      allow delete: if false;
+      
+      // ✅ FAVORITOS: Solo el dueño
+      match /favourites/{favId} {
+        allow read, write: if isOwner(userId);
+        allow create: if isOwner(userId);
+      }
+      
+      // ✅ COMPRAS: Solo lectura y creación, no modificación
+      match /purchases/{purchaseId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create: if isOwner(userId);
+        allow update, delete: if false;
+      }
+    }
+
+    // 🆕 DELIVERY USERS: Gestión COMPLETAMENTE DINÁMICA ✅ SIN RESTRICCIONES DE EMAIL
+    match /deliveryUsers/{userEmail} {
+      allow read: if isAuthenticated();
+      
+      allow create: if isAuthenticated() && isAdmin() && 
+        request.resource.data.email is string &&
+        request.resource.data.name is string &&
+        request.resource.data.zones is list &&
+        request.resource.data.active is bool &&
+        request.resource.data.zones.size() > 0;
+      
+      allow update: if isAuthenticated() && (
+        isAdmin() || 
+        (request.auth.token.email == resource.data.email)
+      );
+      
+      allow delete: if isAuthenticated() && isAdmin();
+      
+      allow list: if isAuthenticated();
+    }
+
+    // ✅ CARRITO DE COMPRAS: Sincronización entre dispositivos
+    match /carts/{userId} {
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow update: if isAuthenticated() && request.auth.uid == userId;
+      allow delete: if isAuthenticated() && request.auth.uid == userId;
+      
+      // Subcollection para items del carrito
+      match /items/{itemId} {
+        allow read, write: if isAuthenticated() && request.auth.uid == userId;
+        allow create: if isAuthenticated() && request.auth.uid == userId &&
+          request.resource.data.keys().hasAll(['productId', 'name', 'price', 'quantity']) &&
+          request.resource.data.productId is number &&
+          request.resource.data.name is string &&
+          request.resource.data.price is number &&
+          request.resource.data.quantity is number &&
+          request.resource.data.quantity > 0 &&
+          request.resource.data.price >= 0;
+        allow update: if isAuthenticated() && request.auth.uid == userId &&
+          request.resource.data.quantity is number &&
+          request.resource.data.quantity > 0;
+        allow delete: if isAuthenticated() && request.auth.uid == userId;
+        allow list: if isAuthenticated() && request.auth.uid == userId;
+      }
+    }
+
+    // ✅ INVENTARIO: 🌟 PÚBLICO PARA LECTURA + COMPRAS PERMITIDAS 🌟
+    match /inventory/{productId} {
+      allow read, list: if true;
+
+      allow create, delete: if isAdmin();
+
+      allow update: if 
+        isAdmin() ||
+        (
+          request.resource.data.keys().hasAll(['productId','name','price','stock','isActive']) &&
+          request.resource.data.stock is number &&
+          request.resource.data.stock >= 0
+        );
+    }
+
+    // ✅ PRODUCTOS: Lectura pública, escritura solo admin
+    match /products/{productId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+      
+      // ✅ COMENTARIOS: Reglas simplificadas y funcionales
+      match /comments/{commentId} {
+        allow read: if true;
+        
+        allow create: if isAuthenticated() && 
+          request.resource.data.userId == request.auth.uid &&
+          request.resource.data.name is string &&
+          request.resource.data.text is string;
+        
+        allow update: if isAuthenticated() && 
+          resource.data.userId == request.auth.uid;
+        
+        allow delete: if isAuthenticated() && 
+          (resource.data.userId == request.auth.uid || isAdmin());
+      }
+    }
+
+    // Bloques para la colección de blogs
+    match /blogs/{blogId} {
+      allow read: if true;
+
+      allow create, update, delete: if isAdmin();
+
+      // Subcollection de comentarios
+      match /comments/{commentId} {
+        allow read: if true;
+
+        allow create: if isAuthenticated() &&
+          request.resource.data.userId == request.auth.uid &&
+          request.resource.data.name is string &&
+          request.resource.data.text is string;
+
+        allow update: if isAuthenticated() &&
+          resource.data.userId == request.auth.uid;
+
+        allow delete: if isAuthenticated() &&
+          (resource.data.userId == request.auth.uid || isAdmin());
+      }
+    }
+
+    // ✅ PEDIDOS DIARIOS: Permitir a usuarios autenticados crear y actualizar durante compras
+    match /dailyOrders/{date} {
+      allow read, list: if true;
+      allow create, update: if true;
+      allow delete: if false;
+    }
+
+    // ✅ DELIVERY ORDERS: Sistema completo con roles + creación durante compras + admin monitoring
+    match /deliveryOrders/{orderId} {
+      allow read: if isAuthenticated() && (
+        isAdmin() ||
+        isDeliveryUser() ||
+        resource.data.userId == request.auth.uid ||
+        true
+      );
+      
+      allow create: if 
+          isAuthenticated() ||
+          (request.resource.data.guestCheckout == true &&
+           request.resource.data.keys().hasAll(['items', 'total', 'status']) &&
+           request.resource.data.total is number &&
+           request.resource.data.items is list &&
+           request.resource.data.items.size() > 0);
+
+      allow update: if isAuthenticated() && (
+        isAdmin() ||
+        (isDeliveryUser() && (
+          isValidDeliveryStatus(request.resource.data.status) ||
+          request.resource.data.keys().hasAny(['assignedTo', 'pickedUpAt', 'deliveredAt', 'location'])
+        )) ||
+        (resource.data.userId == request.auth.uid && (
+          (resource.data.status == 'pending' && request.resource.data.status == 'cancelled') ||
+          request.resource.data.keys().hasAny(['urgent', 'priority'])
+        )) ||
+        (request.resource.data.keys().hasAny(['urgent', 'priority', 'notificationSent', 'urgentMarkedAt']) &&
+         (request.resource.data.urgent is bool || request.resource.data.priority is string))
+      );
+      
+      allow delete: if false;
+      
+      allow list: if isAuthenticated() && (
+        isAdmin() || 
+        isDeliveryUser() ||
+        true
+      );
+    }
+
+    // 🚨 DELIVERY NOTIFICATIONS: REGLAS ESPECÍFICAS
+    match /deliveryNotifications/{notificationId} {
+      allow read: if isAuthenticated();
+      
+      allow create: if isAuthenticated();
+      
+      allow update: if isAuthenticated() && (
+        isAdmin() ||
+        (isDeliveryUser() && (
+          request.resource.data.keys().hasAny(['status', 'readAt', 'readBy', 'acceptedAt', 'acceptedBy', 'deliveredAt']) ||
+          (request.resource.data.status != null && 
+           request.resource.data.status in ['read', 'accepted', 'completed_delivery', 'expired']) ||
+          (request.resource.data.readAt != null) ||
+          (request.resource.data.acceptedAt != null) ||
+          (request.resource.data.readBy != null) ||
+          (request.resource.data.acceptedBy != null)
+        )) ||
+        (request.resource.data.keys().hasAny(['status', 'expiresAt']) &&
+         request.resource.data.status in ['expired', 'completed_delivery', 'read']) ||
+        (request.resource.data.keys().hasAny(['status', 'readAt', 'readBy']) &&
+         resource.data.orderId != null)
+      );
+      
+      allow delete: if isAuthenticated();
+      
+      allow list: if isAuthenticated();
+    }
+
+    // 🆕 DELIVERY ZONES: Configuración de zonas de entrega
+    match /deliveryZones/{zoneId} {
+      allow read: if true;
+      allow list: if true;
+      
+      allow create, update, delete: if isAdmin();
+    }
+
+    // 🆕 DELIVERY PERFORMANCE: Métricas y estadísticas
+    match /deliveryPerformance/{performanceId} {
+      allow read: if isAuthenticated() && (
+        isAdmin() ||
+        (isDeliveryUser() && resource.data.deliveryPersonEmail == request.auth.token.email)
+      );
+      
+      allow create, update: if isAdmin();
+      allow delete: if false;
+      
+      allow list: if isAuthenticated() && (
+        isAdmin() || 
+        isDeliveryUser()
+      );
+    }
+
+    // ✅ DELIVERY RATINGS: Sistema de calificaciones seguro
+    match /deliveryRatings/{ratingId} {
+      allow read: if isAuthenticated() && (
+        isAdmin() ||
+        (isDeliveryUser() && request.auth.token.email == resource.data.deliveryPersonEmail) ||
+        resource.data.userId == request.auth.uid
+      );
+      
+      allow create: if isAuthenticated() && 
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.keys().hasAll(['orderId', 'deliveryPersonEmail', 'userId', 'rating']) &&
+        isValidRating(request.resource.data.rating);
+      
+      allow update, delete: if false;
+      
+      allow list: if isAuthenticated() && (isAdmin() || isDeliveryUser());
+    }
+
+    // 🆕 SYSTEM NOTIFICATIONS: Notificaciones del sistema para admin
+    match /systemNotifications/{notificationId} {
+      allow read: if isAdmin();
+      
+      allow create: if isAdmin();
+      
+      allow update: if isAdmin();
+      
+      allow delete: if isAdmin();
+      allow list: if isAdmin();
+    }
+
+    // 🆕 DELIVERY LOGS: Logs del sistema de delivery para debugging
+    match /deliveryLogs/{logId} {
+      allow read: if isAuthenticated() && (
+        isAdmin() ||
+        isAutomatedSystem()
+      );
+      
+      allow create: if isAuthenticated() && (
+        isAdmin() ||
+        isDeliveryUser() ||
+        isAutomatedSystem()
+      );
+      
+      allow update, delete: if false;
+      allow list: if isAuthenticated() && (
+        isAdmin() ||
+        isAutomatedSystem()
+      );
+    }
+
+    // ✅ LOGS DE SEGURIDAD
+    match /securityLogs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // ✅ SESIONES ACTIVAS
+    match /activeSessions/{sessionId} {
+      allow read, write: if isAuthenticated();
+      allow create: if isAuthenticated();
+    }
+
+    // ✅ RATE LIMITING
+    match /rateLimits/{userId} {
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // 🛍️ CONFIGURACIÓN PÚBLICA (descuentos, banners, etc.)
+    match /publicConfig/{configId} {
+      allow read: if true;
+      allow write: if isAdmin();
+      allow delete: if isAdmin();
+    }
+    
+    // 🆕 CUPONES DE DESCUENTO POR USUARIO
+    match /coupons/{couponCode} {
+      allow read: if isAuthenticated() && (
+        isAdmin() ||
+        resource.data.userId == request.auth.uid
+      );
+
+      allow list: if isAuthenticated() && (
+        isAdmin() ||
+        resource.data.userId == request.auth.uid
+      );
+
+      allow create: if isAuthenticated() && (
+        isAdmin() ||
+        request.resource.data.userId == request.auth.uid
+      );
+
+      allow update: if isAuthenticated() && (
+        isAdmin() ||
+        (
+          resource.data.userId == request.auth.uid &&
+          request.resource.data.userId == request.auth.uid
+        )
+      );
+
+      allow delete: if isAdmin();
+    }
+
+    // ✅ CONFIGURACIÓN DEL SISTEMA
+    match /systemConfig/{configId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // 🔐 EMAIL VERIFICATIONS - OTP CODES (Para validar emails de guests)
+    // Solo el backend (sin auth) puede escribir
+    // Lectura: backend o dueño del email
+    match /emailVerifications/{docId} {
+      allow read: if request.auth == null || 
+                     (request.auth != null && request.resource.data.email == request.auth.token.email);
+      allow write: if request.auth == null;
+    }
+
+    // 🔐 VERIFIED EMAILS - Tracking de emails verificados
+    // Solo el backend (sin auth) puede escribir
+    // Lectura: backend o dueño del email
+    match /verifiedEmails/{docId} {
+      allow read: if request.auth == null || 
+                     (request.auth != null && request.resource.data.email == request.auth.token.email);
+      allow write: if request.auth == null;
+    }
+
+    // 🔐 QUIZ VERIFICATIONS - Server-side quiz result verification
+    // Solo el backend (sin auth) puede escribir
+    // Lectura: backend o usuario autenticado
+    match /quizVerifications/{docId} {
+      allow read: if request.auth == null || isAuthenticated();
+      allow write: if request.auth == null;
+    }
+
+    // ✅ PRUEBAS DE CONEXIÓN (TEMPORAL)
+    match /connectionTest/{testId} {
+      allow read, write: if isAuthenticated();
+    }
+
+  }
+}

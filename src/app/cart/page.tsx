@@ -603,6 +603,7 @@ const CartPage = () => {
         // Pago invitado
         const purchaseData = {
           guestId: `guest_${Date.now()}`,
+          email: guestEmail,
           paymentId: details.id,
           payer: details.payer,
           contact: { name: deliveryLocation?.zone || "Invitado", phone: deliveryLocation?.phone || "", email: guestEmail },
@@ -668,9 +669,11 @@ const CartPage = () => {
           return;
         }
 
-          // --- Enviar correo al invitado ---
+          // --- Enviar correo al invitado (comentado por CSP) ---
+          // TODO: Configurar CSP o usar API en Next.js en lugar de llamada directa
+          /*
           try {
-            const response = await fetch("https://us-central1-academiaonline-f38c4.cloudfunctions.net/sendOrderEmail", {
+            const response = await fetch("https://us-central1-spideysportdb.cloudfunctions.net/sendOrderEmail", {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -691,6 +694,7 @@ const CartPage = () => {
           } catch (emailError: any) {
             console.error('Error enviando correo al invitado:', emailError.message);
           }
+          */
         // --- Fin envío correo ---
 
         await cartService.clearCart();
