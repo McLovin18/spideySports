@@ -241,27 +241,20 @@ export async function getStorageStats(userId: string): Promise<{
       lastAccess: logs.length > 0 ? logs[0].timestamp.toDate() : undefined,
       mostAccessedFile:
         logs.length > 0
-          ? logs.reduce(
-              (acc, log) => ({
-                ...acc,
-                [log.filePath]: (acc[log.filePath] || 0) + 1,
-              }),
-              {} as Record<string, number>
-            )
-            ? Object.keys(
-                logs.reduce(
-                  (acc, log) => ({
-                    ...acc,
-                    [log.filePath]: (acc[log.filePath] || 0) + 1,
-                  }),
-                  {} as Record<string, number>
-                )
-              ).sort(
-                (a, b) =>
-                  (logs.reduce((c, l) => (l.filePath === b ? c + 1 : c), 0) || 0) -
-                  (logs.reduce((c, l) => (l.filePath === a ? c + 1 : c), 0) || 0)
-              )[0]
-            : undefined,
+          ? Object.keys(
+              logs.reduce(
+                (acc, log) => ({
+                  ...acc,
+                  [log.filePath]: (acc[log.filePath] || 0) + 1,
+                }),
+                {} as Record<string, number>
+              )
+            ).sort(
+              (a, b) =>
+                (logs.reduce((c, l) => (l.filePath === b ? c + 1 : c), 0) || 0) -
+                (logs.reduce((c, l) => (l.filePath === a ? c + 1 : c), 0) || 0)
+            )[0]
+          : undefined,
     };
 
     return stats;
