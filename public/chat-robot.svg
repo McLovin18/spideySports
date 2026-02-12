@@ -1,0 +1,34 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <!-- Cabeza del robot -->
+  <rect x="20" y="15" width="60" height="50" rx="8" fill="#e0e7ff" stroke="#4f46e5" stroke-width="2"/>
+  
+  <!-- Pantalla/Ojos -->
+  <rect x="30" y="25" width="40" height="30" rx="4" fill="#1e3a8a" stroke="#4f46e5" stroke-width="1.5"/>
+  
+  <!-- Brillo de pantalla -->
+  <circle cx="42" cy="35" r="3" fill="#60a5fa"/>
+  <circle cx="58" cy="35" r="3" fill="#60a5fa"/>
+  <circle cx="45" cy="45" r="2" fill="#93c5fd"/>
+  <circle cx="55" cy="45" r="2" fill="#93c5fd"/>
+  
+  <!-- Antenas -->
+  <line x1="35" y1="15" x2="35" y2="5" stroke="#4f46e5" stroke-width="2" stroke-linecap="round"/>
+  <circle cx="35" cy="3" r="2" fill="#4f46e5"/>
+  
+  <line x1="65" y1="15" x2="65" y2="5" stroke="#4f46e5" stroke-width="2" stroke-linecap="round"/>
+  <circle cx="65" cy="3" r="2" fill="#4f46e5"/>
+  
+  <!-- Boca sonriente -->
+  <path d="M 40 50 Q 50 55 60 50" stroke="#4f46e5" stroke-width="2" fill="none" stroke-linecap="round"/>
+  
+  <!-- Cuerpo -->
+  <rect x="25" y="70" width="50" height="25" rx="4" fill="#e0e7ff" stroke="#4f46e5" stroke-width="2"/>
+  
+  <!-- Botones del cuerpo -->
+  <circle cx="40" cy="80" r="2" fill="#4f46e5"/>
+  <circle cx="50" cy="80" r="2" fill="#4f46e5"/>
+  <circle cx="60" cy="80" r="2" fill="#4f46e5"/>
+  
+  <!-- Panel frontal -->
+  <rect x="35" y="88" width="30" height="5" rx="1" fill="#4f46e5" opacity="0.3"/>
+</svg>

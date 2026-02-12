@@ -101,6 +101,7 @@ export interface Purchase {
   customerCode?: string; // ID de cliente de 7 dígitos
   orderNumber?: string;  // ID de pedido por cliente (5 dígitos)
   fullOrderId?: string;  // ID global: customerCode + orderNumber
+  couponCode?: string;   // Código del cupón aplicado (para validación)
   pricingAdjustments?: PricingAdjustments;
   triviaResult?: TriviaResultSummary;
 }
@@ -237,6 +238,51 @@ export const savePurchase = async (
 ): Promise<string> => {
   try {
     validatePurchase(purchase);
+
+    // 🔐 VALIDACIÓN DE SEGURIDAD: Recalcular total desde la BD
+    console.log('🔒 [savePurchase] Ejecutando validación final de precio...');
+    const { validateOrderPrice } = await import('./priceValidationService');
+    
+    // Convertir items al formato necesario
+    const purchaseItems = purchase.items.map((item) => ({
+      id: item.id,
+      name: item.name,
+      price: item.price, // Será ignorado, se obtiene de la BD
+      quantity: item.quantity,
+      image: item.image,
+    }));
+
+    // Ejecutar validación
+    const priceValidation = await validateOrderPrice(
+      purchaseItems,
+      purchase.total,
+      purchase.couponCode,
+      purchase.userId,
+      (purchase.pricingAdjustments as any)?.quizDiscount,
+      (purchase.pricingAdjustments as any)?.quizPenalty
+    );
+
+    // Rechazar si hay discrepancia
+    if (!priceValidation.valid) {
+      const errorMsg = `🚨 ALERTA DE SEGURIDAD: Intento de manipular precio detectado. ` +
+        `Total esperado: $${priceValidation.expectedTotal}, ` +
+        `Total recibido: $${priceValidation.receivedTotal}. ` +
+        `Errores: ${priceValidation.errors.join('; ')}`;
+      
+      console.error(errorMsg);
+      console.error('Usuario potencialmente fraudulento:', {
+        userId: purchase.userId,
+        email: userEmail,
+        timestamp: new Date().toISOString(),
+        details: priceValidation,
+      });
+
+      throw new Error(
+        `Validación de precio fallida. Por favor contacta al soporte: ${priceValidation.errors[0] || 'Error desconocido'}`
+      );
+    }
+
+    console.log('✅ [savePurchase] Validación de precio completada exitosamente');
 
     const currentDate = new Date();
     const dateString = purchase.date || currentDate.toISOString();

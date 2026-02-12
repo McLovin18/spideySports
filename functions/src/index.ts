@@ -11,13 +11,11 @@ const EMAIL_PASS = process.env.EMAIL_PASS;
 const corsHandler = cors.default({ origin: true });
 
 export const sendOrderEmail = onRequest((req, res) => {
-  // Usamos corsHandler para manejar CORS
   corsHandler(req, res, async () => {
     if (req.method !== "POST") {
       return res.status(405).json({ error: "Only POST allowed" });
     }
 
-    // Parsear JSON si viene como string
     let body: any = req.body;
     if (typeof body === "string") {
       try {
@@ -34,7 +32,6 @@ export const sendOrderEmail = onRequest((req, res) => {
     }
 
     try {
-      // Configurar Nodemailer
       const transporter = nodemailer.createTransport({
         service: "gmail",
         auth: {
@@ -43,7 +40,6 @@ export const sendOrderEmail = onRequest((req, res) => {
         },
       });
 
-      // Enviar correo
       await transporter.sendMail({
         from: `"Tienda Online" <${EMAIL_USER}>`,
         to: email,
@@ -67,3 +63,4 @@ export const sendOrderEmail = onRequest((req, res) => {
     }
   });
 });
+

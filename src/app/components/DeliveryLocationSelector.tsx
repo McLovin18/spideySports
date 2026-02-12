@@ -55,9 +55,14 @@ export default function DeliveryLocationSelector({ onLocationChange, disabled }:
   // Notificar cambios al componente padre
   useEffect(() => {
     if (selectedCity && selectedZone && phone.trim()) {
+      // Construir nombre completo de zona (ej: "Guayaquil Centro")
+      const fullZoneName = selectedZone === 'Ecuador - Entrega Nacional' 
+        ? 'Ecuador - Entrega Nacional'
+        : `${selectedCity} ${selectedZone}`;
+      
       const locationData: LocationData = {
         city: selectedCity,
-        zone: selectedZone,
+        zone: fullZoneName,
         phone: phone.trim(),
         ...(address.trim() && { address: address.trim() })
       };

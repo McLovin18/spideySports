@@ -12,6 +12,13 @@ interface Message {
   content: string;
   recommendedProducts?: any[];
   timestamp: Date;
+  type?: 'search' | 'info' | 'greeting' | 'help' | 'number' | 'confirmation';
+  metadata?: {
+    resultCount?: number;
+    isNumericAnswer?: boolean;
+    numericValue?: number;
+    infoType?: string;
+  };
 }
 
 interface ChatbotProps {
@@ -20,19 +27,87 @@ interface ChatbotProps {
 
 export default function Chatbot({ isOpen: initialIsOpen = false }: ChatbotProps) {
   const [isOpen, setIsOpen] = useState(initialIsOpen);
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      role: 'assistant',
-      content: '¡Hola! 👋 Soy el asistente de SpideySports. ¿Qué tipo de camiseta deportiva estás buscando hoy?',
-      timestamp: new Date(),
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [loading, setLoading] = useState(false);
   const [conversationHistory, setConversationHistory] = useState<any[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [hasStorageError, setHasStorageError] = useState(false);
+  const storageErrorShownRef = useRef(false);
+
+  // Cargar mensajes del localStorage al iniciar
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const savedMessages = localStorage.getItem('chatbot-messages');
+        if (savedMessages) {
+          try {
+            const parsedMessages = JSON.parse(savedMessages);
+            setMessages(parsedMessages);
+          } catch (parseError) {
+            console.error('Error parseando mensajes guardados:', parseError);
+            // Si hay error al parsear, limpiar y mostrar mensaje inicial
+            localStorage.removeItem('chatbot-messages');
+            setMessages([
+              {
+                id: '1',
+                role: 'assistant',
+                content: '¡Hola! 👋 Soy el asistente de SpideySports. ¿Qué tipo de camiseta deportiva estás buscando hoy?',
+                timestamp: new Date(),
+              },
+            ]);
+          }
+        } else {
+          setMessages([
+            {
+              id: '1',
+              role: 'assistant',
+              content: '¡Hola! 👋 Soy el asistente de SpideySports. ¿Qué tipo de camiseta deportiva estás buscando hoy?',
+              timestamp: new Date(),
+            },
+          ]);
+        }
+      } catch (error) {
+        console.error('Error accediendo al localStorage:', error);
+        setMessages([
+          {
+            id: '1',
+            role: 'assistant',
+            content: '¡Hola! 👋 Soy el asistente de SpideySports. ¿Qué tipo de camiseta deportiva estás buscando hoy?',
+            timestamp: new Date(),
+          },
+        ]);
+      }
+      setIsInitialized(true);
+    }
+  }, []);
+
+  // Guardar mensajes en localStorage cuando cambien
+  useEffect(() => {
+    if (isInitialized && typeof window !== 'undefined' && !hasStorageError) {
+      try {
+        localStorage.setItem('chatbot-messages', JSON.stringify(messages));
+      } catch (error: any) {
+        // Si el localStorage está lleno o hay error, mostrar mensaje SOLO UNA VEZ
+        if ((error.name === 'QuotaExceededError' || error.message.includes('QuotaExceededError')) && !storageErrorShownRef.current) {
+          storageErrorShownRef.current = true;
+          setHasStorageError(true);
+          
+          // Agregar mensaje de error directamente sin usar setMessages (para evitar bucle)
+          const errorMessage: Message = {
+            id: `${Date.now()}_storage_error`,
+            role: 'assistant',
+            content: '⚠️ El chat ha alcanzado su límite de capacidad. Por favor, haz clic en el botón de limpiar (🔄) para borrar el historial y continuar.',
+            timestamp: new Date(),
+          };
+          setMessages((prev) => [...prev, errorMessage]);
+        }
+        console.error('Error guardando mensajes en localStorage:', error);
+      }
+    }
+  }, [messages, isInitialized, hasStorageError]);
 
   // Auto-scroll al final cuando hay nuevos mensajes
   useEffect(() => {
@@ -41,21 +116,39 @@ export default function Chatbot({ isOpen: initialIsOpen = false }: ChatbotProps)
 
   // Focus en input cuando se abre
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && isInitialized) {
       setTimeout(() => inputRef.current?.focus(), 100);
     }
-  }, [isOpen]);
+  }, [isOpen, isInitialized]);
+
+  // Limpiar chat
+  const handleClearChat = () => {
+    const initialMessage: Message = {
+      id: '1',
+      role: 'assistant',
+      content: '¡Hola! 👋 Soy el asistente de SpideySports. ¿Qué tipo de camiseta deportiva estás buscando hoy?',
+      timestamp: new Date(),
+    };
+    setMessages([initialMessage]);
+    setConversationHistory([]);
+    setHasStorageError(false);
+    storageErrorShownRef.current = false;
+    localStorage.setItem('chatbot-messages', JSON.stringify([initialMessage]));
+  };
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!inputValue.trim()) return;
 
+    // Guardar el mensaje antes de limpiar el input
+    const messageText = inputValue;
+
     // Agregar mensaje del usuario
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
-      content: inputValue,
+      content: messageText,
       timestamp: new Date(),
     };
 
@@ -64,20 +157,29 @@ export default function Chatbot({ isOpen: initialIsOpen = false }: ChatbotProps)
     setLoading(true);
 
     try {
-      // Enviar al API
+      // Enviar al API con timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 segundos timeout
+
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          message: inputValue,
+          message: messageText,
           conversationHistory,
         }),
+        signal: controller.signal,
       });
 
+      clearTimeout(timeoutId);
+
       if (!response.ok) {
-        throw new Error('Error del servidor');
+        if (response.status === 413) {
+          throw new Error('El historial de chat es muy largo. Por favor, limpia el chat para continuar.');
+        }
+        throw new Error(`Error del servidor: ${response.status}`);
       }
 
       const data = await response.json();
@@ -89,36 +191,39 @@ export default function Chatbot({ isOpen: initialIsOpen = false }: ChatbotProps)
         content: data.message,
         recommendedProducts: data.products || [],
         timestamp: new Date(),
+        type: data.type,
+        metadata: data.metadata,
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
       setConversationHistory(data.conversationHistory || []);
-    } catch (error) {
-      console.error('Error sending message:', error);
+      setLoading(false);
+    } catch (error: any) {
+      console.error('Error enviando mensaje:', error);
+
+      let errorContent = 'Disculpa, tuve un problema. Intenta de nuevo.';
+      
+      // Detectar tipos específicos de errores
+      if (error.name === 'AbortError') {
+        errorContent = '⏱️ La solicitud tardó demasiado. Intenta de nuevo o limpia el chat si sigue ocurriendo.';
+      } else if (error.message.includes('muy largo')) {
+        errorContent = '⚠️ El historial de chat es muy largo. Por favor, haz clic en el botón de limpiar (🔄) para borrar el historial y continuar.';
+      } else if (error.message.includes('network') || error.message.includes('NetworkError')) {
+        errorContent = '🌐 Error de conexión. Verifica tu conexión a internet e intenta de nuevo.';
+      } else if (error.message.includes('JSON')) {
+        errorContent = '⚠️ Error al procesar la respuesta. Limpia el chat e intenta de nuevo.';
+      }
 
       const errorMessage: Message = {
         id: `${Date.now()}_error`,
         role: 'assistant',
-        content: 'Disculpa, tuve un problema. Intenta de nuevo.',
+        content: errorContent,
         timestamp: new Date(),
       };
 
       setMessages((prev) => [...prev, errorMessage]);
-    } finally {
       setLoading(false);
     }
-  };
-
-  const handleClearChat = () => {
-    setMessages([
-      {
-        id: '1',
-        role: 'assistant',
-        content: '¡Hola de nuevo! 👋 ¿En qué puedo ayudarte?',
-        timestamp: new Date(),
-      },
-    ]);
-    setConversationHistory([]);
   };
 
   return (
@@ -141,6 +246,7 @@ export default function Chatbot({ isOpen: initialIsOpen = false }: ChatbotProps)
               height={50}
               className={styles.chatImage}
               priority
+              unoptimized
             />
           </button>
         </div>
@@ -179,16 +285,16 @@ export default function Chatbot({ isOpen: initialIsOpen = false }: ChatbotProps)
                 <div className={styles.messageContent}>
                   <p>{msg.content}</p>
 
-                  {/* Productos recomendados */}
-                  {msg.recommendedProducts && msg.recommendedProducts.length > 0 && (
+                  {/* Productos recomendados - Solo si es búsqueda o confirmación */}
+                  {msg.recommendedProducts && msg.recommendedProducts.length > 0 && 
+                   (msg.type === 'search' || msg.type === 'confirmation') && (
                     <div className={styles.recommendedProducts}>
-                      <small className={styles.recommendedLabel}>Productos recomendados:</small>
                       {msg.recommendedProducts.map((product) => (
-                        <Card key={product.id} className={styles.productCard}>
-                          {product.image && (
+                        <Card key={product.productId} className={styles.productCard}>
+                          {product.images && product.images.length > 0 && (
                             <Card.Img
                               variant="top"
-                              src={product.image}
+                              src={product.images[0]}
                               alt={product.name}
                               className={styles.productImage}
                             />
@@ -203,7 +309,7 @@ export default function Chatbot({ isOpen: initialIsOpen = false }: ChatbotProps)
                                 <Badge bg="danger">Agotado</Badge>
                               )}
                             </div>
-                            <a href={`/producto/${product.id}`} className={styles.productLink}>
+                            <a href={`/products/${product.productId}`} className={styles.productLink}>
                               Ver producto →
                             </a>
                           </Card.Body>

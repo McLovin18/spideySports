@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { AuthProvider } from './context/AuthContext';
 import { RoleProvider } from './context/adminContext';
+import './utils/firebaseConsoleHelper';
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {

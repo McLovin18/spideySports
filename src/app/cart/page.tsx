@@ -56,6 +56,21 @@ const CartPage = () => {
   const [couponError, setCouponError] = useState('');
   const [validatingCoupon, setValidatingCoupon] = useState(false);
 
+  // 🔐 ESTADOS DE SEGURIDAD - CRÍTICO
+  // Quiz Verification
+  const [quizVerificationId, setQuizVerificationId] = useState<string | null>(null);
+  const [quizVerifying, setQuizVerifying] = useState(false);
+
+  // Email Verification (OTP)
+  const [emailVerified, setEmailVerified] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [otpPhase, setOtpPhase] = useState<'none' | 'waiting' | 'verified'>('none');
+  const [otpSending, setOtpSending] = useState(false);
+  const [otpVerifying, setOtpVerifying] = useState(false);
+
+  // Location Validation
+  const [locationValidating, setLocationValidating] = useState(false);
+
   const subtotal = useMemo(
     () => cartItems.reduce((total, item) => total + item.price * item.quantity, 0),
     [cartItems]
@@ -196,10 +211,10 @@ const CartPage = () => {
     }
   };
 
-  const handleQuizSubmit = (event: React.FormEvent) => {
+  const handleQuizSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
 
-    if (!quizQuestion) return;
+    if (!quizQuestion || !quizConfig) return;
 
     const answer = quizAnswer.trim();
     if (!answer) {
@@ -207,10 +222,54 @@ const CartPage = () => {
       return;
     }
 
-    const normalized = answer.toLowerCase();
-    const isCorrect = quizQuestion.answers.some((expected) => normalized === expected.toLowerCase());
-    setQuizResult(isCorrect ? 'correct' : 'incorrect');
+    // 🔐 VERIFICAR EN SERVIDOR (NO confiar en cliente)
+    setQuizVerifying(true);
     setQuizError('');
+
+    try {
+      console.log('🔒 [SEGURIDAD] Enviando quiz al servidor para verificación...');
+      
+      const response = await fetch('/api/quiz/verify-answer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          answer,
+          quizType: quizConfig.reason,
+          email: user?.uid ? user.email : guestEmail,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setQuizError(`❌ ${data.message || 'Error verificando respuesta'}`);
+        setQuizResult(null);
+        setQuizVerificationId(null);
+        return;
+      }
+
+      if (!data.verified) {
+        // Incorrect answer
+        setQuizResult('incorrect');
+        setQuizError('❌ Respuesta incorrecta. Pierdes la bonificación.');
+        setQuizVerificationId(null);
+        return;
+      }
+
+      // ✅ GUARDAR TOKEN DE VERIFICACIÓN DEL SERVIDOR
+      setQuizVerificationId(data.token);
+      setQuizResult('correct');
+      setQuizError('');
+
+      console.log(`✅ Quiz verificado correctamente. Token: ${data.token}`);
+    } catch (error) {
+      console.error('❌ Error verificando quiz:', error);
+      setQuizError('Error al verificar tu respuesta. Intenta de nuevo.');
+      setQuizResult(null);
+      setQuizVerificationId(null);
+    } finally {
+      setQuizVerifying(false);
+    }
   };
 
   // Aplicar código de descuento
@@ -263,6 +322,91 @@ const CartPage = () => {
     }
   };
 
+  // 🔐 EMAIL VERIFICATION - OTP
+  const handleSendOTP = async () => {
+    if (!guestEmail) {
+      setCouponError('Email requerido');
+      return;
+    }
+
+    setOtpSending(true);
+    setCouponError('');
+
+    try {
+      console.log('📧 Enviando OTP a:', guestEmail);
+      
+      const response = await fetch('/api/email/verify-otp?action=send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: guestEmail }),
+      });
+
+      console.log(`📥 Respuesta de API: Status ${response.status}`);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('❌ Error response:', errorData);
+        throw new Error(errorData.message || `HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('✅ Respuesta exitosa:', data);
+      
+      setOtpPhase('waiting');
+      setCouponError('✅ Código enviado a tu email');
+      console.log(`✅ OTP enviado a ${guestEmail}`);
+    } catch (error) {
+      setCouponError('❌ Error enviando código. Intenta de nuevo.');
+      console.error('Error sending OTP:', error);
+    } finally {
+      setOtpSending(false);
+    }
+  };
+
+  const handleVerifyOTP = async () => {
+    if (!otpCode) {
+      setCouponError('Ingresa el código de 6 dígitos');
+      return;
+    }
+
+    if (!/^\d{6}$/.test(otpCode)) {
+      setCouponError('El código debe tener exactamente 6 dígitos');
+      return;
+    }
+
+    setOtpVerifying(true);
+    setCouponError('');
+
+    try {
+      console.log('🔍 Verificando OTP...');
+      
+      const response = await fetch('/api/email/verify-otp?action=verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: guestEmail,
+          otp: otpCode,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('OTP incorrecto');
+      }
+
+      const data = await response.json();
+      
+      setEmailVerified(true);
+      setOtpPhase('verified');
+      setCouponError('✅ Email verificado correctamente');
+      console.log(`✅ Email verificado: ${guestEmail}`);
+    } catch (error) {
+      setCouponError('❌ Código incorrecto. Intenta de nuevo.');
+      console.error('Error verifying OTP:', error);
+    } finally {
+      setOtpVerifying(false);
+    }
+  };
+
   // Pago exitoso
   const handlePaymentSuccess = async (details: any) => {
     setProcessing(true);
@@ -271,6 +415,99 @@ const CartPage = () => {
     try {
       if (!deliveryLocation) {
         setSaveError("Por favor selecciona una ubicación de entrega.");
+        setProcessing(false);
+        return;
+      }
+
+      // 🔐 VALIDACIÓN DE SEGURIDAD CRÍTICA: Verificar que el precio pagado coincida con lo esperado
+      console.log('%c🔒 [SEGURIDAD] INICIANDO VALIDACIÓN DE PRECIO', 'color: #ff0000; font-weight: bold; font-size: 14px');
+      console.log('   - Items en carrito:', cartItems.length);
+      console.log('   - Total calculado:', finalTotal);
+      console.log('   - Usuario:', user?.uid || 'GUEST (sin autenticar)');
+      console.log('   - Cupón aplicado:', appliedCoupon?.code || 'NINGUNO');
+      console.log('   - ID Transacción PayPal:', details.id);
+      
+      let validationPassed = false;
+      
+      try {
+        console.log('\n📤 Enviando solicitud de validación a API...');
+
+        // 🔐 SEGURIDAD: Si window.priceOverride está definida, se usa para TESTING (simula manipulación)
+        const totalToSend = (window as any).priceOverride !== undefined ? (window as any).priceOverride : finalTotal;
+        if ((window as any).priceOverride !== undefined) {
+          console.log('%c🔴 [TEST] PRICE OVERRIDE ACTIVADO', 'color: red; font-weight: bold; font-size: 14px');
+          console.log('   Total Real:', finalTotal);
+          console.log('   Total Enviado (MANIPULADO):', totalToSend);
+        }
+
+        const validationResponse = await fetch('/api/cart/validate-total', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            items: cartItems.map((item) => ({
+              id: item.id.toString(),
+              quantity: item.quantity,
+            })),
+            total: totalToSend,
+            userId: user?.uid,
+          }),
+        });
+
+        console.log(`📥 Respuesta API: Status ${validationResponse.status}`);
+
+        if (!validationResponse.ok) {
+          const validationError = await validationResponse.json();
+          console.error('%c❌ [SEGURIDAD] VALIDACIÓN RECHAZADA POR LA API', 'color: #ff0000; font-weight: bold; font-size: 14px');
+          console.error('Error:', JSON.stringify(validationError, null, 2));
+          
+          setSaveError(
+            `🚨 ${validationError.message || 'Error de seguridad: No se pudo validar el precio. Por favor contacta al soporte.'}`
+          );
+          setProcessing(false);
+          return;
+        }
+
+        const validationResult = await validationResponse.json();
+        
+        console.log('%c✅ [SEGURIDAD] RESPUESTA DE API RECIBIDA', 'color: #00aa00; font-weight: bold; font-size: 14px');
+        console.log('   - Válido:', validationResult.valid ? '✅ SÍ' : '❌ NO');
+        console.log('   - Total esperado:', validationResult.serverTotal);
+        console.log('   - Total recibido:', validationResult.clientTotal);
+        console.log('   - Diferencia:', validationResult.difference || 0);
+        console.log('   - Detalles:', JSON.stringify(validationResult.priceDetails, null, 2));
+        
+        if (!validationResult.valid) {
+          console.error('%c🚨 [SEGURIDAD] DISCREPANCIA DE PRECIO DETECTADA - INTENTO DE FRAUDE POTENCIAL', 'color: #ff0000; font-weight: bold; font-size: 16px');
+          console.error('Razón:', validationResult.message);
+          
+          setSaveError(
+            `🚨 Alerta de seguridad: Discrepancia de precio detectada.\nTotal esperado: $${validationResult.expectedTotal || validationResult.serverTotal}\nTotal intentado: $${validationResult.clientTotal}\n\nPor favor contacta al soporte.`
+          );
+          setProcessing(false);
+          return;
+        }
+        
+        validationPassed = true;
+        console.log('%c✅ [SEGURIDAD] VALIDACIÓN COMPLETADA - PRECIO CORRECTO', 'color: #00aa00; font-weight: bold; font-size: 14px');
+        
+      } catch (fetchError: any) {
+        console.error('%c❌ [SEGURIDAD] ERROR CRÍTICO EN VALIDACIÓN', 'color: #ff0000; font-weight: bold; font-size: 14px');
+        console.error('Error:', fetchError);
+        setSaveError(`🚨 Error crítico de validación: ${fetchError.message || 'Error desconocido'}`);
+        setProcessing(false);
+        return;
+      }
+      
+      if (!validationPassed) {
+        console.error('❌ Validación no completada');
+        setProcessing(false);
+        return;
+      }
+
+      // 🔐 VALIDACIÓN DE SEGURIDAD: Verificar que si hay descuento de quiz, tenga token válido
+      if (quizCampaignActive && quizResult === 'correct' && !quizVerificationId) {
+        console.error('%c❌ [SEGURIDAD] QUIZ VERIFICATION TOKEN FALTANTE', 'color: #ff0000; font-weight: bold; font-size: 14px');
+        setSaveError('❌ Error de seguridad: Token de verificación de quiz faltante. Intenta responder el quiz nuevamente.');
         setProcessing(false);
         return;
       }
@@ -291,6 +528,7 @@ const CartPage = () => {
               ? {
                   discountApplied: true,
                   discountAmount: quizDiscountAmount,
+                  verificationToken: quizVerificationId,
                 }
               : {
                   discountApplied: false,
@@ -298,6 +536,68 @@ const CartPage = () => {
                 }),
           }
         : undefined;
+
+      // 🔐 VALIDACIÓN DE SEGURIDAD: Verificar ubicación de entrega
+      console.log('%c🔐 [SEGURIDAD] VALIDANDO UBICACIÓN DE ENTREGA', 'color: #0066ff; font-weight: bold; font-size: 14px');
+      console.log('   Zona enviada:', deliveryLocation.zone);
+      console.log('   Ciudad:', deliveryLocation.city);
+      console.log('   Dirección:', deliveryLocation.address);
+      console.log('   Teléfono:', deliveryLocation.phone);
+      setLocationValidating(true);
+      
+      try {
+        const locationValidationResponse = await fetch('/api/delivery/validate-location', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            zone: deliveryLocation.zone,
+            city: deliveryLocation.city,
+            address: deliveryLocation.address,
+            phone: deliveryLocation.phone,
+          }),
+        });
+
+        const locationValidationResult = await locationValidationResponse.json();
+        
+        if (!locationValidationResult.success || !locationValidationResult.valid) {
+          console.error('%c❌ [SEGURIDAD] UBICACIÓN INVÁLIDA', 'color: #ff0000; font-weight: bold; font-size: 14px');
+          console.error('Error:', locationValidationResult.message);
+          console.error('Respuesta del servidor:', locationValidationResult);
+          
+          setSaveError(
+            `❌ Ubicación inválida: ${locationValidationResult.message || 'Verifica los datos de entrega.'}`
+          );
+          setLocationValidating(false);
+          setProcessing(false);
+          return;
+        }
+        
+        console.log('%c✅ [SEGURIDAD] UBICACIÓN VALIDADA', 'color: #00aa00; font-weight: bold; font-size: 14px');
+        console.log('Zona:', locationValidationResult.zone.name);
+        console.log('Costo de envío:', locationValidationResult.zone.shippingCost);
+        setLocationValidating(false);
+      } catch (locationError: any) {
+        console.error('%c❌ [SEGURIDAD] ERROR EN VALIDACIÓN DE UBICACIÓN', 'color: #ff0000; font-weight: bold; font-size: 14px');
+        console.error('Error:', locationError);
+        setSaveError(`❌ Error al validar ubicación: ${locationError.message}`);
+        setLocationValidating(false);
+        setProcessing(false);
+        return;
+      }
+
+      // 🔐 VALIDACIÓN DE SEGURIDAD: Si es invitado, verificar email
+      if (!user?.uid) {
+        console.log('%c🔐 [SEGURIDAD] VERIFICANDO EMAIL DE INVITADO', 'color: #0066ff; font-weight: bold; font-size: 14px');
+        
+        if (!emailVerified) {
+          console.error('%c❌ [SEGURIDAD] EMAIL NO VERIFICADO', 'color: #ff0000; font-weight: bold; font-size: 14px');
+          setSaveError('❌ Por favor verifica tu email antes de completar la compra.');
+          setProcessing(false);
+          return;
+        }
+        
+        console.log('%c✅ [SEGURIDAD] EMAIL VERIFICADO', 'color: #00aa00; font-weight: bold; font-size: 14px');
+      }
 
       if (!user?.uid) {
         // Pago invitado
@@ -321,6 +621,8 @@ const CartPage = () => {
           total: finalTotal,
           ...(pricingAdjustmentsPayload ? { pricingAdjustments: pricingAdjustmentsPayload } : {}),
           ...(triviaResultSummary ? { triviaResult: triviaResultSummary } : {}),
+          ...(quizVerificationId ? { quizVerificationId } : {}),
+          emailVerified: emailVerified,
           date: new Date().toISOString(),
           status: "paid"
         };
@@ -334,17 +636,34 @@ const CartPage = () => {
         let guestPurchaseId: string | null = null;
 
         try {
+          console.log('💾 Guardando compra de invitado en Firestore...');
           guestPurchaseId = await guestPurchaseService.saveGuestPurchase(purchaseData);
+          console.log('✅ Compra guardada:', guestPurchaseId);
+          
+          console.log('📦 Procesando inventario...');
           await inventoryService.processOrder(itemsToProcess);
-        } catch (stockError: any) {
+          console.log('✅ Inventario procesado');
+          
+        } catch (saveError: any) {
+          console.error('❌ ERROR AL GUARDAR COMPRA:', saveError);
+          
           if (guestPurchaseId) {
-            const rollbackSucceeded = await guestPurchaseService.deleteGuestPurchase(guestPurchaseId);
-            if (!rollbackSucceeded) {
-              console.error('No se pudo revertir la compra de invitado tras fallo de stock.');
+            try {
+              console.log('🔄 Intentando revertir compra por error de stock...');
+              const rollbackSucceeded = await guestPurchaseService.deleteGuestPurchase(guestPurchaseId);
+              if (!rollbackSucceeded) {
+                console.error('❌ No se pudo revertir la compra de invitado.');
+              } else {
+                console.log('✅ Compra revertida correctamente');
+              }
+            } catch (rollbackError) {
+              console.error('❌ Error al revertir:', rollbackError);
             }
           }
 
-          setSaveError(stockError?.message || 'Algunos productos no tienen stock suficiente.');
+          const errorMsg = saveError?.message || 'Error al guardar tu compra. Por favor contacta al soporte.';
+          console.error('Mostrando error al usuario:', errorMsg);
+          setSaveError(`❌ ${errorMsg}`);
           setProcessing(false);
           return;
         }
@@ -415,6 +734,7 @@ const CartPage = () => {
           versionLabel: item.versionLabel,
         })),
         total: finalTotal,
+        couponCode: appliedCoupon?.code, // 🔐 Agregar código del cupón para validación
         paypalDetails: {
           transactionId: details.id,
           status: details.status,
@@ -434,7 +754,8 @@ const CartPage = () => {
           phone: deliveryLocation?.phone || 'Teléfono no especificado'
         },
         ...(pricingAdjustmentsPayload ? { pricingAdjustments: pricingAdjustmentsPayload } : {}),
-        ...(triviaResultSummary ? { triviaResult: triviaResultSummary } : {})
+        ...(triviaResultSummary ? { triviaResult: triviaResultSummary } : {}),
+        ...(quizVerificationId ? { quizVerificationId } : {})
       };
 
       const purchaseId = await savePurchase(purchaseData, userInfo.userName, userInfo.userEmail);
@@ -744,11 +1065,74 @@ const CartPage = () => {
                         </Form.Group>
                       )}
 
+                      {!user?.uid && (
+                        <div className="mb-3">
+                          {otpPhase === 'none' && (
+                            <Button
+                              className="btn-cosmetic-primary w-100"
+                              onClick={handleSendOTP}
+                              disabled={!guestEmail || otpSending || processing}
+                            >
+                              {otpSending ? (
+                                <>
+                                  <i className="bi bi-hourglass-split me-2"></i>
+                                  Enviando código...
+                                </>
+                              ) : (
+                                <>
+                                  <i className="bi bi-shield-lock me-2"></i>
+                                  Verificar mi correo
+                                </>
+                              )}
+                            </Button>
+                          )}
+
+                          {otpPhase === 'waiting' && (
+                            <Form.Group>
+                              <Form.Label className="small text-muted">Código de verificación (6 dígitos)</Form.Label>
+                              <Form.Control
+                                type="text"
+                                placeholder="000000"
+                                value={otpCode}
+                                onChange={(e) => setOtpCode(e.target.value)}
+                                maxLength={6}
+                                inputMode="numeric"
+                                disabled={otpVerifying || processing}
+                              />
+                              <Button
+                                className="btn-cosmetic-primary w-100 mt-2"
+                                onClick={handleVerifyOTP}
+                                disabled={otpCode.length !== 6 || otpVerifying || processing}
+                              >
+                                {otpVerifying ? (
+                                  <>
+                                    <i className="bi bi-hourglass-split me-2"></i>
+                                    Verificando...
+                                  </>
+                                ) : (
+                                  <>
+                                    <i className="bi bi-check-circle me-2"></i>
+                                    Verificar código
+                                  </>
+                                )}
+                              </Button>
+                            </Form.Group>
+                          )}
+
+                          {otpPhase === 'verified' && (
+                            <div className="alert alert-success d-flex align-items-center gap-2 mb-0">
+                              <i className="bi bi-check-circle-fill"></i>
+                              <span>¡Correo verificado correctamente!</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                       <PayPalButton
                         amount={finalTotal}
                         onSuccess={handlePaymentSuccess}
                         onError={handlePayPalError}
-                        disabled={cartItems.length === 0 || processing || !deliveryLocation || (!user?.uid && !guestEmail)}
+                        disabled={cartItems.length === 0 || processing || !deliveryLocation || (!user?.uid && !guestEmail) || (!user?.uid && !emailVerified)}
                         guestEmail={!user?.uid ? guestEmail : undefined}
                       />
 

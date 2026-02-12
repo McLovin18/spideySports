@@ -41,30 +41,31 @@
 
 /* Botón flotante */
 .floatingButton {
-  width: auto;
-  height: auto;
-  border-radius: 16px;
-  background: transparent;
+  width: 100px;
+  height: 100px;
+  border-radius: 0;
+  background: transparent !important;
   border: none;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-  transition: all 0.3s ease;
+  box-shadow: none;
+  transition: transform 0.3s ease;
   position: relative;
   padding: 0;
   overflow: visible;
 }
 
 .chatImage {
-  width: 50px;
-  height: 50px;
+  width: 80px;
+  height: 80px;
   display: block;
-  border-radius: 12px;
+  border-radius: 0;
   transition: transform 0.3s ease;
   object-fit: contain;
-  background: transparent;
+  background: transparent !important;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
 }
 
 .floatingButton:hover .chatImage {
@@ -72,8 +73,7 @@
 }
 
 .floatingButton:hover {
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
-  transform: translateY(-2px);
+  box-shadow: none;
 }
 
 .floatingButton:active {
@@ -83,10 +83,10 @@
 /* Ventana de chat */
 .chatWindow {
   position: fixed;
-  bottom: 100px;
+  bottom: 30px;
   right: 20px;
   width: 380px;
-  height: 600px;
+  height: 490px;
   background: white;
   border-radius: 12px;
   box-shadow: 0 5px 40px rgba(0, 0, 0, 0.16);
@@ -173,7 +173,7 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  background-color: #f8f9fa;
+  background-color: #fafbfc;
 
   &::-webkit-scrollbar {
     width: 6px;
@@ -220,11 +220,13 @@
 
 .messageContent {
   max-width: 85%;
-  padding: 10px 14px;
+  padding: 12px 16px;
   border-radius: 10px;
-  line-height: 1.4;
+  line-height: 1.6;
   font-size: 14px;
   word-wrap: break-word;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  font-weight: 500;
 
   p {
     margin: 0;
@@ -234,16 +236,19 @@
 .user {
   .messageContent {
     background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
-    color: white;
+    color: #ffffff;
     border-bottom-right-radius: 2px;
+    font-weight: 600;
   }
 }
 
 .assistant {
   .messageContent {
-    background: #e5e7eb;
-    color: #1f2937;
+    background: rgba(5, 44, 51, 0.92) !important;
+    color: #0a2342;
     border-bottom-left-radius: 2px;
+    border-left: 4px solid #0f766e;
+    font-weight: 500;
   }
 }
 
@@ -318,10 +323,11 @@
 
 /* Chat form */
 .chatForm {
-  padding: 12px;
+  padding: 14px;
   border-top: 1px solid #e5e7eb;
-  background: white;
+  background: #ffffff;
   flex-shrink: 0;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .inputGroup {
@@ -332,19 +338,32 @@
 
 .chatInput {
   flex: 1;
-  border: 1px solid #d1d5db;
+  border: 2px solid #d1d5db;
   border-radius: 20px;
-  padding: 10px 16px;
+  padding: 12px 18px;
   font-size: 14px;
-  transition: all 0.2s ease;
+  background: #ffffff;
+  color: #1f2937;
+  transition: all 0.3s ease;
+  font-weight: 500;
+
+  &::placeholder {
+    color: #9ca3af;
+    opacity: 1;
+    font-style: italic;
+  }
 
   &:focus {
     border-color: #0f766e;
+    background: #f9fafb;
+    color: #1f2937;
     box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.1);
+    outline: none;
   }
 
   &:disabled {
     background: #f3f4f6;
+    color: #9ca3af;
   }
 }
 
@@ -352,17 +371,19 @@
   background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
   border: none;
   border-radius: 50%;
-  width: 38px;
-  height: 38px;
+  width: 42px;
+  height: 42px;
   padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.2s ease;
+  color: white;
+  flex-shrink: 0;
 
   &:hover:not(:disabled) {
-    transform: scale(1.05);
-    box-shadow: 0 2px 8px rgba(15, 118, 110, 0.3);
+    transform: scale(1.08);
+    box-shadow: 0 4px 12px rgba(15, 118, 110, 0.3);
   }
 
   &:active:not(:disabled) {
@@ -377,12 +398,13 @@
 
 /* Chat footer */
 .chatFooter {
-  padding: 8px 12px;
-  background: #f3f4f6;
+  padding: 12px;
+  background: linear-gradient(135deg, #f0f4f8 0%, #f8fafc 100%);
   text-align: center;
-  color: #6b7280;
-  border-top: 1px solid #e5e7eb;
+  color: #0f766e;
+  border-top: 1px solid #d1d5db;
   font-size: 12px;
+  font-weight: 600;
 }
 
 /* Responsive */

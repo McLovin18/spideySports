@@ -34,6 +34,7 @@ import { EmailService } from '../../services/emailService';
 import NavbarComponent from '../../components/Navbar';
 import Sidebar from '../../components/Sidebar';
 import DeliverySettings from '../../components/DeliverySettings';
+import DeliveryZonesManager from '../../components/DeliveryZonesManager';
 import TopbarMobile from '../../components/TopbarMobile';
 import Footer from '../../components/Footer';
 import StockAlert from '../../components/StockAlert';
@@ -853,7 +854,10 @@ export default function AdminOrdersPage() {
 
               {/* Tab de Configuraciones de Delivery */}
               {activeTab === 'delivery-settings' && (
-                <DeliverySettings />
+                <>
+                  <DeliveryZonesManager className="mb-5" />
+                  <DeliverySettings />
+                </>
               )}
 
             </Container>
