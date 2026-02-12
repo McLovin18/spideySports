@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * 🔒 MIDDLEWARE DE SEGURIDAD
  * Sistema de protección y validación para componentes

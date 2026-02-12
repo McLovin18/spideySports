@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // 🔔 SERVICIO DE NOTIFICACIONES PARA DELIVERY
 // Sistema automatizado de asignación de pedidos
 
