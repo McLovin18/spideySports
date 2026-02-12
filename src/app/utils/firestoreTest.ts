@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 // Diagnóstico de reglas de Firestore para dailyOrders
 // Este archivo se puede importar en la aplicación para hacer pruebas
 

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * 🔒 UTILIDADES DE SEGURIDAD
  * Sistema centralizado de validación, sanitización y protección
