@@ -23,7 +23,7 @@ import {
 import { logStorageAccess, detectSuspiciousActivity } from '@/app/utils/storageAudit';
 import { getClientIP, checkRateLimit } from '@/app/utils/rateLimiter';
 import { logAudit } from '@/app/utils/auditLogger';
-import { sanitizeInput } from '@/app/utils/validation';
+import { sanitizeString } from '@/app/utils/validation';
 
 interface UploadResponse {
   success: boolean;
@@ -183,7 +183,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<UploadRes
 
     // ✅ VALIDAR CONTENIDO REAL (Magic Bytes)
     const buffer = await file.arrayBuffer();
-    const fileName = sanitizeInput(file.name);
+    const fileName = sanitizeString(file.name);
     const filePath = `${uploadType}/${userId}/${Date.now()}-${fileName}`;
 
     const contentValidation = await validateFileContent(filePath, file.type);

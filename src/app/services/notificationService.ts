@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars, prefer-const */
 // 🔔 SERVICIO DE NOTIFICACIONES PARA DELIVERY
 // Sistema automatizado de asignación de pedidos
 

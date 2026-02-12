@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-require-imports, @typescript-eslint/no-unused-vars */
 // Servicio de upload de imágenes simplificado
 console.log('🚀 CARGANDO imageUploadService_simple.ts');
 

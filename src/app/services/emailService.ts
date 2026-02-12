@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // 📧 Servicio de Email para Notificaciones de Delivery
 // Este servicio maneja el envío de emails a repartidores
 

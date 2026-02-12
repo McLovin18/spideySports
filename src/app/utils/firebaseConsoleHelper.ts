@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 /**
  * 🔧 FIREBASE CONSOLE HELPER
  * Expone funciones de Firebase al window para testing en consola

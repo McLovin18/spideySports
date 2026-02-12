@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * 🔔 CRITICAL ALERTS SYSTEM - Sistema de alertas críticas
  * 

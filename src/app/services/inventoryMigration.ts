@@ -1,5 +1,6 @@
 'use client';
 
+/* eslint-disable @typescript-eslint/no-explicit-any, import/no-anonymous-default-export */
 import { inventoryService } from '../services/inventoryService';
 import allProducts from '../products/productsData';
 

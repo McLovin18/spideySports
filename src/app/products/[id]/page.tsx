@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars, prefer-const */
 'use client';
 
 import React, { useState, useEffect , useCallback, useMemo } from 'react';

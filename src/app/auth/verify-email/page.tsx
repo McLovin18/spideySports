@@ -2,7 +2,8 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { sendEmailVerification, auth } from '../../utils/firebase';
+import { sendEmailVerification } from 'firebase/auth';
+import { auth } from '../../utils/firebase';
 import { Button, Card, Alert } from 'react-bootstrap';
 
 const VerifyEmail = () => {

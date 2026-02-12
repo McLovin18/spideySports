@@ -15,7 +15,8 @@ type Paragraph = {
 
 export default function BlogEditorPage() {
   const router = useRouter();
-  const { blogId } = useParams();
+  const params = useParams();
+  const blogId = (params as any).blogId || null;
   const [title, setTitle] = useState("");
   const [summary, setSummary] = useState("");
   const [paragraphs, setParagraphs] = useState<Paragraph[]>([{ type: "text", content: "" }]);

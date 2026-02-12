@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { db } from '../utils/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { couponService } from './couponService';

@@ -9,13 +9,14 @@ export async function generateStaticParams() {
   }));
 }
 
-export default function ProductsByCategoryPage({
+export default async function ProductsByCategoryPage({
   params,
 }: {
-  params: { category: string };
+  params: Promise<{ category: string }>;
 }) {
+  const { category } = await params;
   // Buscar info en la lista de subcategorías por su "value" (slug)
-  const categoryInfo = SUBCATEGORIES.find((c) => c.value === params.category);
+  const categoryInfo = SUBCATEGORIES.find((c) => c.value === category);
 
   // si no existe la categoría -> 404
   if (!categoryInfo) {

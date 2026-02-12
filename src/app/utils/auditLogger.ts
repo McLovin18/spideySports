@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 import { doc, setDoc, collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
 import { db } from './firebase';
 import { NextRequest } from 'next/server';

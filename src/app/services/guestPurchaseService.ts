@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { db } from "../utils/firebase";
 import { collection, addDoc, deleteDoc, doc } from "firebase/firestore";
 

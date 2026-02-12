@@ -347,6 +347,15 @@ const allProducts = [
       'Frasco de 75ml'
     ]
   },
+  {
+    id: 18,
+    name: 'Mascarilla de Arcilla Purificante',
+    price: 22.99,
+    images: ['https://images.unsplash.com/photo-1556228578-8c89e6adf883?w=400&h=400&fit=crop&q=80'],
+    category: 'Cuidado de Piel',
+    categoryLink: '/skin-care',
+    description: 'Mascarilla de arcilla de aluvión que purifica profundamente.',
+    inStock: true,
     details: [
       'Arcilla bentonita y carbón activado',
       'Elimina impurezas y toxinas',
